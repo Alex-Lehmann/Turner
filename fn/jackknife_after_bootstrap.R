@@ -1,67 +1,45 @@
-# Extracts row IDs and prepares bootstrap results for jackknife ----------------
-prep_boots = function(boots) {
+# Performs jackknife-after-bootstrap (JAB) and computes estimates, influence
+# values, and quantiles for outlier detection use
+jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
   # Extract row IDs in each bootstrap sample
   boots = boots %>%
     mutate(samples = map(splits, extract_row_ids))
-}
-
-# Computes absolute and relative influence values for each observation ---------
-eval_influence = function(boots) {
-  # Get all IDs in original sample
+  
+  # Jackknife samples in a tibble
   sample_ids = get_sample_ids(boots)
   n = length(sample_ids)
-  
-  # Jackknife bootstrap samples
-  jk_stats = rep(NA, n)
-  for (cur_id in sample_ids) {
-    jk_stats[i] = boots %>%
-      filter(map_lgl(samples, function(x) { !(cur_id %in% x) })) %>%
-      pull(estimate) %>%
-      mean()
-  }
-  jk_stats = tibble(
-               row_id = sample_ids,
-               deleted_point_values = jk_stats
-             )
-  
-  # Compute influence function
-  jk_mean = mean(jk_stats$deleted_point_values)
-  jk_stats = jk_stats %>%
-    mutate(
-      abs_influence = (n - 1)*(jk_mean - deleted_point_values),
-      rel_influence = abs_influence/sqrt(sum(abs_influence^2/(n - 1)))
-    ) %>%
-    select(row_id, abs_influence, rel_influence)
-  
-  return(jk_stats)
-}
-
-# Returns the passed quantiles for bootstrap samples after leaving out one -----
-# observation at a time --------------------------------------------------------
-get_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
-  # Get all IDs in original sample
-  sample_ids = get_sample_ids(boots)
-  n = length(sample_ids)
-  
-  # Make matrix
-  matrix_cols = length(probs) + 1
-  percentiles = matrix(rep(NA, n * matrix_cols), ncol = matrix_cols)
-  
-  # Find percentiles when leaving out each point
+  jk_sample = list()
   for (i in 1:n) {
     cur_id = sample_ids[i]
-    cur_percentiles = boots %>%
-      filter(map_lgl(samples, function(x) { !(cur_id %in% x) })) %>%
-      pull(estimate) %>%
-      quantile(probs = probs)
-    percentiles[i, ] = c(cur_id, cur_percentiles)
+    jk_sample[[i]] = filter(boots,
+                        map_lgl(samples, function(x) { !cur_id %in% x})
+                      )
+  }
+  jab_values = tibble(deleted_case = sample_ids, jk_sample = jk_sample)
+  
+  # Compute jackknife statistic, influence values, and quantiles
+  jab_values = mutate(jab_values,
+                 estimate = jk_sample %>%
+                   map(function(x) {
+                         x %>%
+                           pull(estimate) %>%
+                           mean()
+                       }) %>%
+                   unlist(),
+                 abs_influence = (n - 1) * (mean(estimate) - estimate),
+                 rel_influence = abs_influence / sqrt(
+                                                   sum(abs_influence^2/(n - 1))
+                                                 )
+               )
+  for (p in probs) {
+    jab_values = mutate(jab_values,
+                   !!paste0("quantile_", p) := jk_sample %>%
+                     map(function(x) { quantile(x$estimate, p) }) %>%
+                     unlist()
+                 )
   }
   
-  # Convert percentile matrix to tibble
-  percentiles = as_tibble(percentiles, .name_repair = "minimal")
-  colnames(percentiles) = c("row_id", paste0("percentile_", probs))
-  
-  return(percentiles)
+  return(jab_values)
 }
 
 # Computes uncertainty bands using IQR and normal theory for each quantile
@@ -73,7 +51,9 @@ get_uncertainty_bands = function(boots, probs = c(0.05, 0.50, 0.95)) {
                       )
   
   # Find band widths and construct upper/lower bounds
-  band_width = 1.96 * IQR(boots$estimate)
+  uncertainty_bands$band_width = jab_values %>%
+    summarize(across(starts_with("quantile"), function(x) { IQR(x)*1.96 })) %>%
+    unlist()
   uncertainty_bands = mutate(uncertainty_bands,
                         lower = full_quantile - band_width,
                         upper = full_quantile + band_width

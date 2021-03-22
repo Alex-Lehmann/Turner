@@ -70,19 +70,13 @@ shinyServer(function(input, output, session) {
         )
       ) %>%
       unnest(model) %>%
-      rename(estimate = model) %>%
-      prep_boots()
+      rename(estimate = model)
     
     # Compute mean estimate
     values$boot_stat = mean(values$boot_reps$estimate)
     
-    # Outlier detection groundwork
-    values$jab_values = inner_join(
-                          eval_influence(values$boot_reps),
-                          get_percentiles(values$boot_reps),
-                          by = "row_id"
-                        )
-    values$jab_uncertainty_bands = get_uncertainty_bands(values$boot_reps)
+    # Jackknife-after-bootstrap for outlier detection
+    values$jab_values = jackknife_after_bootstrap(values$boot_reps)
   })
   
   # Results ====================================================================
