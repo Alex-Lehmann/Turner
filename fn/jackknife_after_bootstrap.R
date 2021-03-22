@@ -8,13 +8,7 @@ prep_boots = function(boots) {
 # Computes absolute and relative influence values for each observation ---------
 eval_influence = function(boots) {
   # Get all IDs in original sample
-  sample_ids = boots %>%
-    filter(id == "Apparent") %>%
-    pull(splits) %>%
-    extract2(1) %>%
-    assessment() %>%
-    pull(row_id) %>%
-    unique()
+  sample_ids = get_sample_ids(boots)
   n = length(sample_ids)
   
   # Jackknife bootstrap samples
@@ -44,15 +38,9 @@ eval_influence = function(boots) {
 
 # Returns the passed quantiles for bootstrap samples after leaving out one -----
 # observation at a time --------------------------------------------------------
-find_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
+jackknife_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
   # Get all IDs in original sample
-  sample_ids = boots %>%
-    filter(id == "Apparent") %>%
-    pull(splits) %>%
-    extract2(1) %>%
-    assessment() %>%
-    pull(row_id) %>%
-    unique()
+  sample_ids = get_sample_ids(boots)
   n = length(sample_ids)
   
   # Make matrix
@@ -92,4 +80,16 @@ extract_row_ids = function(split, mode = "analysis") {
     unique() %>%
     as.list()
   return(row_ids)
+}
+
+# Get all IDs in original sample -----------------------------------------------
+get_sample_ids = function(boots) {
+  sample_ids = boots %>%
+    filter(id == "Apparent") %>%
+    pull(splits) %>%
+    extract2(1) %>%
+    assessment() %>%
+    pull(row_id) %>%
+    unique()
+  sample_ids
 }
