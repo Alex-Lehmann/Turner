@@ -10,7 +10,11 @@ shinyServer(function(input, output, session) {
     if (tools::file_ext(path) != "csv") {
       message(paste0("File ", path, " is not a .csv file."))
       return()
-    } else values$user_file = readr::read_csv(path, col_types=cols())
+    } else {
+      # Add row IDs
+      df = readr::read_csv(path, col_types=cols())
+      values$user_file = mutate(df, row_id = 1:nrow(df))
+    }
   })
   
   # UI objects =================================================================
@@ -40,7 +44,7 @@ shinyServer(function(input, output, session) {
     # Generate bootstrap samples
     values$boot_samples = bootstraps(
                             values$user_file,
-                            times = input$param_B,
+                            times = values$param_B,
                             apparent=TRUE
                           )
     
@@ -51,15 +55,8 @@ shinyServer(function(input, output, session) {
         fn(na.rm = TRUE)
     }
     
-    # Get max number of decimals for rounding later
-    values$decimals = values$user_file %>%
-      pull(as.name(values$param_variable)) %>%
-      count_decimals() %>%
-      max()
-    print(values$decimals)
-    
     # Compute statistic on boostrap samples
-    statistic = switch(input$param_statistic,
+    statistic = switch(values$param_statistic,
                   "Mean" = mean,
                   "Median" = median
                 )
@@ -68,7 +65,7 @@ shinyServer(function(input, output, session) {
         model = map(
           splits,
           compute_statistic,
-          variable = input$param_variable,
+          variable = values$param_variable,
           fn = statistic
         )
       ) %>%
@@ -94,10 +91,10 @@ shinyServer(function(input, output, session) {
                        na.rm = TRUE
                      )
     values$ci = tibble(
-           estimate = values$boot_estimate,
-           upper = 2 * values$boot_estimate - lower_quantile,
-           lower = 2 * values$boot_estimate - upper_quantile
-         )
+                  estimate = values$boot_estimate,
+                  upper = 2 * values$boot_estimate - lower_quantile,
+                  lower = 2 * values$boot_estimate - upper_quantile
+                )
     
     # Generate plot
     fig = ggplot() +
