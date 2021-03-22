@@ -30,6 +30,11 @@ shinyUI(fluidPage(
                 # Numeric results ----------------------------------------------
                 column(width = 3, htmlOutput("boots_results")),
               )
+            ),
+            
+            # Outlier detection ------------------------------------------------
+            tabPanel("Outlier Detection",
+              plotOutput("jab_plot")
             )
           )
         ),

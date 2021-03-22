@@ -60,7 +60,7 @@ shinyServer(function(input, output, session) {
                   "Mean" = mean,
                   "Median" = median
                 )
-    values$boot_stats = values$boot_samples %>%
+    values$boot_reps = values$boot_samples %>%
       mutate(
         model = map(
           splits,
@@ -70,10 +70,19 @@ shinyServer(function(input, output, session) {
         )
       ) %>%
       unnest(model) %>%
-      rename(estimate = model)
+      rename(estimate = model) %>%
+      prep_boots()
     
     # Compute mean estimate
-    values$boot_estimate = mean(values$boot_stats$estimate)
+    values$boot_stat = mean(values$boot_reps$estimate)
+    
+    # Outlier detection groundwork
+    values$jab_values = inner_join(
+                          eval_influence(values$boot_reps),
+                          get_percentiles(values$boot_reps),
+                          by = "row_id"
+                        )
+    values$jab_uncertainty_bands = get_uncertainty_bands(values$boot_reps)
   })
   
   # Results ====================================================================
@@ -81,24 +90,24 @@ shinyServer(function(input, output, session) {
   output$boots_histogram = renderPlotly({
     # Compute pivot confidence interval bounds
     upper_quantile = quantile(
-                       values$boot_stats$estimate,
+                       values$boot_reps$estimate,
                        probs = 1 - (input$ci_alpha / 2),
                        na.rm = TRUE
                      )
     lower_quantile = quantile(
-                       values$boot_stats$estimate,
+                       values$boot_reps$estimate,
                        probs = input$ci_alpha / 2,
                        na.rm = TRUE
                      )
     values$ci = tibble(
-                  estimate = values$boot_estimate,
-                  upper = 2 * values$boot_estimate - lower_quantile,
-                  lower = 2 * values$boot_estimate - upper_quantile
+                  estimate = values$boot_stat,
+                  upper = 2 * values$boot_stat - lower_quantile,
+                  lower = 2 * values$boot_stat - upper_quantile
                 )
     
     # Generate plot
     fig = ggplot() +
-      geom_histogram(values$boot_stats, mapping = aes(estimate)) +
+      geom_histogram(values$boot_reps, mapping = aes(estimate)) +
       geom_vline(
         values$ci,
         mapping = aes(xintercept = estimate, color = "Mean")) +
@@ -118,7 +127,7 @@ shinyServer(function(input, output, session) {
         
         # Estimates ------------------------------------------------------------
         h3("Estimate"),
-        h4(values$boot_estimate),
+        h4(values$boot_stat),
         h3(paste0((1 - input$ci_alpha)*100, "% Pivot CI")),
         h4(paste0("(", values$ci$lower, ", ", values$ci$upper, ")")),
         
@@ -130,5 +139,20 @@ shinyServer(function(input, output, session) {
         h4(paste0("Variable: ", values$param_variable))
       )
     )
+  })
+  
+  # Outlier detection ==========================================================
+  # Jackknife-after-bootstrap plot ---------------------------------------------
+  output$jab_plot = renderPlot({
+    fig = ggplot(values$jab_values, aes(x = rel_influence)) +
+      
+      # Quantiles
+      geom_point(aes(y = percentile_0.05)) +
+      geom_line(aes(y = percentile_0.05)) +
+      geom_point(aes(y = percentile_0.5)) +
+      geom_line(aes(y = percentile_0.5)) +
+      geom_point(aes(y = percentile_0.95)) +
+      geom_line(aes(y = percentile_0.95))
+    fig
   })
 })

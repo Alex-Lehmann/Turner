@@ -13,9 +13,9 @@ eval_influence = function(boots) {
   
   # Jackknife bootstrap samples
   jk_stats = rep(NA, n)
-  for (i in sample_ids) {
+  for (cur_id in sample_ids) {
     jk_stats[i] = boots %>%
-      filter(map_lgl(samples, function(x) { i %in% x })) %>%
+      filter(map_lgl(samples, function(x) { !(cur_id %in% x) })) %>%
       pull(estimate) %>%
       mean()
   }
@@ -38,7 +38,7 @@ eval_influence = function(boots) {
 
 # Returns the passed quantiles for bootstrap samples after leaving out one -----
 # observation at a time --------------------------------------------------------
-jackknife_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
+get_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
   # Get all IDs in original sample
   sample_ids = get_sample_ids(boots)
   n = length(sample_ids)
@@ -51,7 +51,7 @@ jackknife_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
   for (i in 1:n) {
     cur_id = sample_ids[i]
     cur_percentiles = boots %>%
-      filter(map_lgl(samples, function(x) { cur_id %in% x })) %>%
+      filter(map_lgl(samples, function(x) { !(cur_id %in% x) })) %>%
       pull(estimate) %>%
       quantile(probs = probs)
     percentiles[i, ] = c(cur_id, cur_percentiles)
@@ -62,6 +62,23 @@ jackknife_percentiles = function(boots, probs = c(0.05, 0.50, 0.95)) {
   colnames(percentiles) = c("row_id", paste0("percentile_", probs))
   
   return(percentiles)
+}
+
+# Computes uncertainty bands using IQR and normal theory for each quantile
+get_uncertainty_bands = function(boots, probs = c(0.05, 0.50, 0.95)) {
+  # Find full-data bootstrap quantiles
+  uncertainty_bands = tibble(
+                        quantiles = probs,
+                        full_quantile = quantile(boots$estimate, probs = probs)
+                      )
+  
+  # Find band widths and construct upper/lower bounds
+  band_width = 1.96 * IQR(boots$estimate)
+  uncertainty_bands = mutate(uncertainty_bands,
+                        lower = full_quantile - band_width,
+                        upper = full_quantile + band_width
+                      )
+  return(uncertainty_bands)
 }
 
 # Helpers ======================================================================
