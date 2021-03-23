@@ -8,18 +8,18 @@ jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
   # Jackknife samples in a tibble
   sample_ids = get_sample_ids(boots)
   n = length(sample_ids)
-  jk_sample = list()
+  jack_sample = list()
   for (i in 1:n) {
     cur_id = sample_ids[i]
-    jk_sample[[i]] = filter(boots,
+    jack_sample[[i]] = filter(boots,
                         map_lgl(samples, function(x) { !cur_id %in% x})
                       )
   }
-  jab_values = tibble(deleted_case = sample_ids, jk_sample = jk_sample)
+  jab_values = tibble(deleted_case = sample_ids, jack_sample = jack_sample)
   
   # Compute jackknife statistic, influence values, and quantiles
   jab_values = mutate(jab_values,
-                 estimate = map_dbl(jk_sample, function(x) { mean(x$estimate)}),
+                 estimate=map_dbl(jack_sample, function(x) { mean(x$estimate)}),
                  abs_influence = (n - 1) * (mean(estimate) - estimate),
                  rel_influence = abs_influence / sqrt(
                                                    sum(abs_influence^2/(n - 1))
@@ -27,9 +27,11 @@ jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
                )
   for (p in probs) {
     jab_values = mutate(jab_values,
-                   !!paste0("quantile_", p) := jk_sample %>%
-                     map(function(x) { quantile(x$estimate, p) }) %>%
-                     unlist()
+                   !!paste0("quantile_", p) := map_dbl(jack_sample,
+                                                 function(x) {
+                                                   quantile(x$estimate, p)
+                                                 }
+                                               )
                  )
   }
   
@@ -37,7 +39,7 @@ jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
 }
 
 # Computes uncertainty bands using IQR and normal theory for each quantile
-get_uncertainty_bands = function(boots, probs = c(0.05, 0.50, 0.95)) {
+get_uncertainty_bands = function(boots, jack, probs = c(0.05, 0.50, 0.95)) {
   # Find full-data bootstrap quantiles
   uncertainty_bands = tibble(
                         quantiles = probs,
@@ -45,7 +47,7 @@ get_uncertainty_bands = function(boots, probs = c(0.05, 0.50, 0.95)) {
                       )
   
   # Find band widths and construct upper/lower bounds
-  uncertainty_bands$band_width = boots %>%
+  uncertainty_bands$band_width = jack %>%
     summarize(across(starts_with("quantile"), function(x) { IQR(x)*1.96 })) %>%
     unlist()
   uncertainty_bands = mutate(uncertainty_bands,

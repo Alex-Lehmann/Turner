@@ -77,7 +77,10 @@ shinyServer(function(input, output, session) {
     
     # Jackknife-after-bootstrap for outlier detection
     values$jab_values = jackknife_after_bootstrap(values$boot_reps)
-    values$jab_uncertainty = get_uncertainty_bands(values$jab_values)
+    values$jab_uncertainty = get_uncertainty_bands(
+                               values$boot_reps,
+                               values$jab_values
+                             )
   })
   
   # Results ====================================================================
@@ -140,14 +143,24 @@ shinyServer(function(input, output, session) {
   # Jackknife-after-bootstrap plot ---------------------------------------------
   output$jab_plot = renderPlot({
     fig = ggplot(values$jab_values, aes(x = rel_influence)) +
+      # Full-data quantiles and uncertainty bands
+      geom_hline(
+        aes(yintercept = full_quantile),
+        data = values$jab_uncertainty
+      ) +
+      geom_rect(
+        aes(xmin = -Inf, xmax = Inf, ymin = lower, ymax = upper, alpha = 0.35),
+        data = values$jab_uncertainty,
+        inherit.aes = FALSE
+      ) +
       
       # Quantiles
-      geom_point(aes(y = percentile_0.05)) +
-      geom_line(aes(y = percentile_0.05)) +
-      geom_point(aes(y = percentile_0.5)) +
-      geom_line(aes(y = percentile_0.5)) +
-      geom_point(aes(y = percentile_0.95)) +
-      geom_line(aes(y = percentile_0.95))
+      geom_point(aes(y = quantile_0.05)) +
+      geom_line(aes(y = quantile_0.05)) +
+      geom_point(aes(y = quantile_0.5)) +
+      geom_line(aes(y = quantile_0.5)) +
+      geom_point(aes(y = quantile_0.95)) +
+      geom_line(aes(y = quantile_0.95))
     fig
   })
 })
