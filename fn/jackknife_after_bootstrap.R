@@ -19,13 +19,7 @@ jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
   
   # Compute jackknife statistic, influence values, and quantiles
   jab_values = mutate(jab_values,
-                 estimate = jk_sample %>%
-                   map(function(x) {
-                         x %>%
-                           pull(estimate) %>%
-                           mean()
-                       }) %>%
-                   unlist(),
+                 estimate = map_dbl(jk_sample, function(x) { mean(x$estimate)}),
                  abs_influence = (n - 1) * (mean(estimate) - estimate),
                  rel_influence = abs_influence / sqrt(
                                                    sum(abs_influence^2/(n - 1))
@@ -51,7 +45,7 @@ get_uncertainty_bands = function(boots, probs = c(0.05, 0.50, 0.95)) {
                       )
   
   # Find band widths and construct upper/lower bounds
-  uncertainty_bands$band_width = jab_values %>%
+  uncertainty_bands$band_width = boots %>%
     summarize(across(starts_with("quantile"), function(x) { IQR(x)*1.96 })) %>%
     unlist()
   uncertainty_bands = mutate(uncertainty_bands,

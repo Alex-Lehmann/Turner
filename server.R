@@ -77,6 +77,7 @@ shinyServer(function(input, output, session) {
     
     # Jackknife-after-bootstrap for outlier detection
     values$jab_values = jackknife_after_bootstrap(values$boot_reps)
+    values$jab_uncertainty = get_uncertainty_bands(values$jab_values)
   })
   
   # Results ====================================================================
