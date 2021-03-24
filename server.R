@@ -22,41 +22,20 @@ shinyServer(function(input, output, session) {
     values$param_statistic = input$param_statistic
     values$param_variable = input$param_variable
     
-    # Generate bootstrap samples
-    values$boot_samples = bootstraps(
+    # Resample
+    boot_results = do_bootstrap(
       values$user_file,
-      times = values$param_B,
-      apparent=TRUE
-    )
-    
-    # Helper function to compute statistic
-    compute_statistic = function(split, variable, fn) {
-      analysis(split) %>%
-        pull(as.name(variable)) %>%
-        fn(na.rm = TRUE)
-    }
-    
-    # Compute statistic on boostrap samples
-    statistic = switch(values$param_statistic,
-                       "Mean" = mean
-    )
-    values$boot_reps = values$boot_samples %>%
-      mutate(
-        model = map(
-          splits,
-          compute_statistic,
-          variable = values$param_variable,
-          fn = statistic
-        )
-      ) %>%
-      unnest(model) %>%
-      rename(estimate = model)
-    values$boot_stat = mean(values$boot_reps$estimate)
+      B = input$param_B,
+      fn = input$param_statistic,
+      variable = input$param_variable)
+    values$boot_reps = boot_results$reps
+    values$boot_stat = boot_results$stat
     
     # Navigate to results
     updateTabsetPanel(session, "wizard", selected = "boot_results")
     remove_modal_spinner()
   })
+  
   observeEvent(input$settings_previous, {
     updateTabsetPanel(session, "wizard", selected = "data_upload")
   })
@@ -77,6 +56,7 @@ shinyServer(function(input, output, session) {
     updateTabsetPanel(session, "wizard", selected = "outlier_detection")
     remove_modal_spinner()
   })
+  
   observeEvent(input$boot_results_previous, {
     updateTabsetPanel(session, "wizard", selected = "settings")
   })
@@ -184,7 +164,7 @@ shinyServer(function(input, output, session) {
   
   # Outlier detection ==========================================================
   # Jackknife-after-bootstrap plot ---------------------------------------------
-  output$jab_plot = renderPlot({
+  output$jab_plot = renderPlotly({
     fig = ggplot(values$jab_values, aes(x = rel_influence)) +
       # Full-data quantiles and uncertainty bands
       geom_hline(

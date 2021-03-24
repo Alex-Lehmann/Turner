@@ -1,31 +1,34 @@
-library(tidymodels)
-
 # Performs nonparametric bootstrap resampling
-do_bootstrap = function(df, B, statistic, variable) {
+do_bootstrap = function(df, B, fn, variable) {
   # Generate bootstrap samples
   boot_samples = bootstraps(df, times = B, apparent = TRUE)
   
   # Compute statistic on bootstrap samples
-  reps = values$boot_reps %>%
+  statistic = select_fn(fn)
+  reps = boot_samples %>%
     mutate(
       estimate = map(
                    splits,
-                   compute_statistic,
+                   function(split, fn, variable) {
+                     split %>%
+                       analysis() %>%
+                       pull(as.name(variable)) %>%
+                       fn()
+                   },
                    variable = variable,
-                   statistic = statistic
+                   fn = statistic
                  )
     ) %>%
-    unnest(model)
-  boot_stat = mean(boot_reps$estimate)
-  
+    unnest(estimate)
+  boot_stat = mean(reps$estimate)
+
   return(list(reps = reps, stat = boot_stat))
 }
 
 # Helpers ======================================================================
-# Computes statistic on bootstrap samples
-compute_statistic = function(split, variable, statistic) {
-  split %>%
-    analysis() %>%
-    pull(as.name(variable)) %>%
-    fn()
+# Selects functino to apply ----------------------------------------------------
+select_fn = function(fn) {
+  switch(fn,
+         "Mean" = mean
+  )
 }

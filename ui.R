@@ -52,7 +52,7 @@ shinyUI(fluidPage(
             value=1000,
             step=1,
           ),
-          selectInput("param_statistic", "Statistic:", c("Mean" = mean)),
+          selectInput("param_statistic", "Statistic:", c("Mean")),
           uiOutput("select_variable"),
           hr(),
           # Navigation ---------------------------------------------------------
@@ -92,7 +92,7 @@ shinyUI(fluidPage(
         
         tabPanelBody("outlier_detection",
           titlePanel("Outliers"),
-          plotOutput("jab_plot")
+          plotlyOutput("jab_plot")
         )
       )
     )
