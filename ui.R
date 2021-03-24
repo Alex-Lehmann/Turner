@@ -22,11 +22,11 @@ shinyUI(fluidPage(
               HTML("<p>Turner is an app built to make boostrapping procedures and
                their related diagnostics accessible and easy to use. Turner uses
                the <a href='https://www.tidymodels.org/'>tidymodels</a>
-               framework to resample your provided data employs a number of
+               framework to resample your provided data and employs a number of
                diagnostic methods to ensure your results are robust."),
-              HTML("<p><b>Important note:</b> Turner is a work-in-progress. Some
+              HTML("<p><b>Important note: Turner is a work-in-progress. Some
                features may be missing or may not work properly. The user
-               interface may be ugly. Use at your own risk."),
+               interface may be ugly. Use at your own risk.</b>"),
               hr(),
               actionButton("welcome_next", "Start", width="100%")
             )
@@ -35,7 +35,7 @@ shinyUI(fluidPage(
         
         # Data upload page =====================================================
         tabPanelBody("data_upload",
-          h1("1. Data"),
+          titlePanel("Data"),
           fileInput("user_file", "Upload your data as a CSV", accept = ".csv"),
           DT::dataTableOutput("data_preview"),
           uiOutput("data_upload_next")
@@ -43,7 +43,7 @@ shinyUI(fluidPage(
         
         # Bootstrap setup page =================================================
         tabPanelBody("settings",
-          h1("2. Bootstrap Setup"),
+          titlePanel("Bootstrap Setup"),
           # Settings -----------------------------------------------------------
           numericInput(
             "param_B",
@@ -52,7 +52,7 @@ shinyUI(fluidPage(
             value=1000,
             step=1,
           ),
-          selectInput("param_statistic", "Statistic:", c("Mean")),
+          selectInput("param_statistic", "Statistic:", c("Mean" = mean)),
           uiOutput("select_variable"),
           hr(),
           # Navigation ---------------------------------------------------------
@@ -68,7 +68,7 @@ shinyUI(fluidPage(
         
         # Bootstrap results page ===============================================
         tabPanelBody("boot_results",
-          h1("3. Results"),
+          titlePanel("Preliminary Results"),
           # Results ------------------------------------------------------------
           uiOutput("results_summary"),
           plotlyOutput("results_hist"),
@@ -91,7 +91,7 @@ shinyUI(fluidPage(
         ),
         
         tabPanelBody("outlier_detection",
-          h1("4. Outlier Detection"),
+          titlePanel("Outliers"),
           plotOutput("jab_plot")
         )
       )

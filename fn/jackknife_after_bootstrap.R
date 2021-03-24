@@ -1,5 +1,5 @@
-# Performs jackknife-after-bootstrap (JAB) and computes estimates, influence
-# values, and quantiles for outlier detection use
+# Performs jackknife-after-bootstrap (JAB) and computes estimates, influence ---
+# values, and quantiles for outlier detection use ------------------------------
 jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
   # Extract row IDs in each bootstrap sample
   boots = boots %>%
@@ -38,11 +38,11 @@ jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
   return(jab_values)
 }
 
-# Computes uncertainty bands using IQR and normal theory for each quantile
+# Computes uncertainty bands using IQR and normal theory for each quantile -----
 get_uncertainty_bands = function(boots, jack, probs = c(0.05, 0.50, 0.95)) {
   # Find full-data bootstrap quantiles
   uncertainty_bands = tibble(
-                        quantiles = probs,
+                        quantile = probs,
                         full_quantile = quantile(boots$estimate, probs = probs)
                       )
   
@@ -55,6 +55,33 @@ get_uncertainty_bands = function(boots, jack, probs = c(0.05, 0.50, 0.95)) {
                         upper = full_quantile + band_width
                       )
   return(uncertainty_bands)
+}
+
+# Checks jackknifed bootstrap results for outliers------------------------------
+check_outliers = function(jack, uncertainty, probs = c(0.05, 0.50, 0.95)) {
+  # Vector to store detected outliers
+  outliers = NULL
+  
+  # Check each quantile for outliers
+  for (p in probs) {
+    # Get center and range for given quantile
+    uncertainty_row = filter(uncertainty, quantile == p)
+    full_quantile = uncertainty_row$full_quantile
+    band_width = uncertainty_row$band_width
+    
+    # Get case ID of any/all cases outside uncertainty range
+    col_name = paste0("quantile_", p)
+    quantile_outliers = jack %>%
+      filter(abs(!!as.name(col_name) - full_quantile) > band_width)
+    if (length(quantile_outliers) > 0) {
+      outliers = c(outliers, quantile_outliers)
+    }
+  }
+  
+  # Remove redundant entries and return
+  outliers %>%
+    unique() %>%
+    return()
 }
 
 # Helpers ======================================================================

@@ -96,6 +96,12 @@ shinyServer(function(input, output, session) {
   })
   
   # UI objects =================================================================
+  # Data preview ---------------------------------------------------------------
+  output$data_preview = DT::renderDataTable({
+    # Don't display table until something is loaded
+    if (is.null(values$user_file)) return(NULL) else return(values$user_file)
+  }, options=list(scrollX=TRUE))
+  
   # Data page conditional action button ----------------------------------------
   output$data_upload_next = renderUI({
     ui = NULL
@@ -118,24 +124,6 @@ shinyServer(function(input, output, session) {
     
     # Generate input
     selectInput("param_variable", "Variable:", choices)
-  })
-  
-  # Data preview ---------------------------------------------------------------
-  output$data_preview = DT::renderDataTable({
-    # Don't display table until something is loaded
-    if (is.null(values$user_file)) return(NULL) else return(values$user_file)
-  }, options=list(scrollX=TRUE))
-  
-  # Bootstrap procedure ========================================================
-  observeEvent(input$go, {
-    
-    
-    # Jackknife-after-bootstrap for outlier detection
-    values$jab_values = jackknife_after_bootstrap(values$boot_reps)
-    values$jab_uncertainty = get_uncertainty_bands(
-                               values$boot_reps,
-                               values$jab_values
-                             )
   })
   
   # Results ====================================================================
