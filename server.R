@@ -165,25 +165,80 @@ shinyServer(function(input, output, session) {
   # Outlier detection ==========================================================
   # Jackknife-after-bootstrap plot ---------------------------------------------
   output$jab_plot = renderPlotly({
-    fig = ggplot(values$jab_values, aes(x = rel_influence)) +
-      # Full-data quantiles and uncertainty bands
-      geom_hline(
-        aes(yintercept = full_quantile),
-        data = values$jab_uncertainty
-      ) +
-      geom_rect(
-        aes(xmin = -Inf, xmax = Inf, ymin = lower, ymax = upper, alpha = 0.35),
-        data = values$jab_uncertainty,
-        inherit.aes = FALSE
-      ) +
+    # Base Plotly object
+    fig = plot_ly(type = "scatter")
+    
+    for (q in str_subset(colnames(values$jab_values), "^quantile_")) {
+      # Extract quantile value from name
+      quantile_prob = q %>%
+        str_extract("(?<=_).*") %>%
+        as.numeric()
       
-      # Quantiles
-      geom_point(aes(y = quantile_0.05)) +
-      geom_line(aes(y = quantile_0.05)) +
-      geom_point(aes(y = quantile_0.5)) +
-      geom_line(aes(y = quantile_0.5)) +
-      geom_point(aes(y = quantile_0.95)) +
-      geom_line(aes(y = quantile_0.95))
+      # Sorted tibble to trace
+      jack_data = values$jab_values %>%
+        select(rel_influence, as.name(q)) %>%
+        arrange(rel_influence)
+      colnames(jack_data) = c("x", "y")
+      
+      # Get uncertainty for this quantile and make Plotly-friendly
+      uncertainty_interval = filter(
+                               values$jab_uncertainty,
+                               quantile == quantile_prob
+                             )
+      x = values$jab_values$rel_influence
+      x_bounds = c(min(x), max(x))
+      uncertainty_data = tibble(
+                           x = x_bounds,
+                           quantile = rep(uncertainty_interval$full_quantile,2),
+                           upper = rep(uncertainty_interval$upper, 2),
+                           lower = rep(uncertainty_interval$lower, 2)
+                         )
+      
+      # Generate plot
+      fig = fig %>%
+        # Uncertainty bands
+        add_trace(
+          data = uncertainty_data,
+          x = ~x, y = ~quantile,
+          name = paste0("Full-data ", quantile_prob * 100, "% quantile"),
+          mode = "lines",
+          line = list(color = "#000000", dash = "dash"),
+          showlegend = FALSE, hoverinfo = "skip"
+        ) %>%
+        add_trace(
+          data = uncertainty_data,
+          x = ~x, y = ~upper,
+          mode = "lines",
+          line = list(color = "transparent"),
+          fillcolor = "rgba(0, 0, 0, 0.2)",
+          showlegend = FALSE, hoverinfo = "skip"
+        ) %>%
+        add_trace(
+          data = uncertainty_data,
+          x = ~x, y = ~lower,
+          mode = "lines",
+          line = list(color = "transparent"),
+          fill = "tonexty", fillcolor = "rgba(0, 0, 0, 0.2)",
+          showlegend = FALSE, hoverinfo = "skip"
+        ) %>%
+        # Jackknife quantiles
+        add_trace(
+          data = jack_data,
+          x = ~x,
+          y = ~y,
+          name = paste0(quantile_prob * 100, "% quantile"),
+          mode = "lines+markers",
+          color = "orange",
+          hovertemplate = "Influence: %{x}<br>Value: %{y}"
+        ) %>%
+        # Axes
+        layout(
+          title = "Jackknife-After-Bootstrap Plot",
+          xaxis = list(title = "Relative Influence"),
+          yaxis = list(title = "Value")
+        )
+    }
+    
     fig
   })
 })
