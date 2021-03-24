@@ -92,7 +92,8 @@ shinyUI(fluidPage(
         
         tabPanelBody("outlier_detection",
           titlePanel("Outliers"),
-          plotlyOutput("jab_plot")
+          plotlyOutput("jab_plot"),
+          DT::dataTableOutput("outliers")
         )
       )
     )

@@ -72,7 +72,8 @@ check_outliers = function(jack, uncertainty, probs = c(0.05, 0.50, 0.95)) {
     # Get case ID of any/all cases outside uncertainty range
     col_name = paste0("quantile_", p)
     quantile_outliers = jack %>%
-      filter(abs(!!as.name(col_name) - full_quantile) > band_width)
+      filter(abs(!!as.name(col_name) - full_quantile) > band_width) %>%
+      pull(deleted_case)
     if (length(quantile_outliers) > 0) {
       outliers = c(outliers, quantile_outliers)
     }

@@ -52,6 +52,7 @@ shinyServer(function(input, output, session) {
                                values$boot_reps,
                                values$jab_values
                              )
+    values$outliers = check_outliers(values$jab_values, values$jab_uncertainty)
     # Navigate to outlier page
     updateTabsetPanel(session, "wizard", selected = "outlier_detection")
     remove_modal_spinner()
@@ -166,7 +167,13 @@ shinyServer(function(input, output, session) {
   # Jackknife-after-bootstrap plot ---------------------------------------------
   output$jab_plot = renderPlotly({
     # Base Plotly object
-    fig = plot_ly(type = "scatter")
+    fig = plot_ly(type = "scatter", showlegend = FALSE) %>%
+      layout(
+        title = "Jackknife-After-Bootstrap Plot",
+        xaxis = list(title = "Relative Influence"),
+        yaxis = list(title = "Value")
+      ) %>%
+      config(displayModeBar = FALSE)
     
     for (q in str_subset(colnames(values$jab_values), "^quantile_")) {
       # Extract quantile value from name
@@ -176,9 +183,13 @@ shinyServer(function(input, output, session) {
       
       # Sorted tibble to trace
       jack_data = values$jab_values %>%
-        select(rel_influence, as.name(q)) %>%
+        mutate(outlier = ifelse(deleted_case %in% values$outliers,
+                           TRUE, FALSE
+                         )
+               ) %>%
+        select(deleted_case, rel_influence, as.name(q), outlier) %>%
         arrange(rel_influence)
-      colnames(jack_data) = c("x", "y")
+      colnames(jack_data) = c("deleted_case", "x", "y", "outlier")
       
       # Get uncertainty for this quantile and make Plotly-friendly
       uncertainty_interval = filter(
@@ -194,32 +205,29 @@ shinyServer(function(input, output, session) {
                            lower = rep(uncertainty_interval$lower, 2)
                          )
       
-      # Generate plot
+      # Add traces
       fig = fig %>%
         # Uncertainty bands
         add_trace(
           data = uncertainty_data,
           x = ~x, y = ~quantile,
           name = paste0("Full-data ", quantile_prob * 100, "% quantile"),
-          mode = "lines",
-          line = list(color = "#000000", dash = "dash"),
-          showlegend = FALSE, hoverinfo = "skip"
+          mode = "lines",line = list(color = "#000000", dash = "dash"),
+          hoverinfo = "skip"
         ) %>%
         add_trace(
           data = uncertainty_data,
           x = ~x, y = ~upper,
-          mode = "lines",
-          line = list(color = "transparent"),
+          mode = "lines", line = list(color = "transparent"),
           fillcolor = "rgba(0, 0, 0, 0.2)",
-          showlegend = FALSE, hoverinfo = "skip"
+          hoverinfo = "skip"
         ) %>%
         add_trace(
           data = uncertainty_data,
           x = ~x, y = ~lower,
-          mode = "lines",
-          line = list(color = "transparent"),
+          mode = "lines", line = list(color = "transparent"),
           fill = "tonexty", fillcolor = "rgba(0, 0, 0, 0.2)",
-          showlegend = FALSE, hoverinfo = "skip"
+          hoverinfo = "skip"
         ) %>%
         # Jackknife quantiles
         add_trace(
@@ -227,18 +235,30 @@ shinyServer(function(input, output, session) {
           x = ~x,
           y = ~y,
           name = paste0(quantile_prob * 100, "% quantile"),
-          mode = "lines+markers",
+          mode = "markers", marker = list(size = 10),
+          symbol = ~outlier, symbols = c("o", "x"),
           color = "orange",
           hovertemplate = "Influence: %{x}<br>Value: %{y}"
         ) %>%
-        # Axes
-        layout(
-          title = "Jackknife-After-Bootstrap Plot",
-          xaxis = list(title = "Relative Influence"),
-          yaxis = list(title = "Value")
+        add_trace(
+          data = jack_data,
+          x = ~x,
+          y = ~y,
+          mode = "lines",
+          color = "orange",
+          hoverinfo = "skip"
         )
     }
     
+    values$jab_plot = fig
     fig
+  })
+  
+  # Outlier display ------------------------------------------------------------
+  output$outliers = DT::renderDataTable({
+    if (length(values$outliers > 0)){
+      values$user_file %>%
+        filter(row_id %in% values$outliers)
+    } else NULL
   })
 })
