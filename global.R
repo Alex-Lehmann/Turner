@@ -3,6 +3,7 @@ library(tidyverse)
 library(tidymodels)
 library(plotly)
 library(magrittr)
+library(shinybusy)
 
 # Functions ====================================================================
 source("fn/count_decimals.R")

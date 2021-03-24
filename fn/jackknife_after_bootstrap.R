@@ -12,7 +12,7 @@ jackknife_after_bootstrap = function(boots, probs = c(0.05, 0.50, 0.95)) {
   for (i in 1:n) {
     cur_id = sample_ids[i]
     jack_sample[[i]] = filter(boots,
-                        map_lgl(samples, function(x) { !cur_id %in% x})
+                        map_lgl(samples, function(x) { !cur_id %in% x })
                       )
   }
   jab_values = tibble(deleted_case = sample_ids, jack_sample = jack_sample)
@@ -64,7 +64,7 @@ extract_row_ids = function(split, mode = "analysis") {
   set_fn = switch(mode,
                   "analysis" = analysis,
                   "assessment" = assessment
-  )
+           )
   
   # Extract row IDs
   row_ids = split %>%

@@ -3,6 +3,84 @@ library(shiny)
 shinyServer(function(input, output, session) {
   values = reactiveValues()
   
+  # Wizard navigation buttons ==================================================
+  # Welcome page ---------------------------------------------------------------
+  observeEvent(input$welcome_next, {
+    updateTabsetPanel(session, "wizard", selected = "data_upload")
+  })
+  # Data upload page -----------------------------------------------------------
+  observeEvent(input$data_upload_next, {
+    updateTabsetPanel(session, "wizard", selected = "settings")
+  })
+  # Settings page --------------------------------------------------------------
+  observeEvent(input$settings_next, {
+    # Show busy dialog
+    show_modal_spinner(spin = "swapping-squares", text = "Resampling...")
+    
+    # Store settings for reporting
+    values$param_B = input$param_B
+    values$param_statistic = input$param_statistic
+    values$param_variable = input$param_variable
+    
+    # Generate bootstrap samples
+    values$boot_samples = bootstraps(
+      values$user_file,
+      times = values$param_B,
+      apparent=TRUE
+    )
+    
+    # Helper function to compute statistic
+    compute_statistic = function(split, variable, fn) {
+      analysis(split) %>%
+        pull(as.name(variable)) %>%
+        fn(na.rm = TRUE)
+    }
+    
+    # Compute statistic on boostrap samples
+    statistic = switch(values$param_statistic,
+                       "Mean" = mean
+    )
+    values$boot_reps = values$boot_samples %>%
+      mutate(
+        model = map(
+          splits,
+          compute_statistic,
+          variable = values$param_variable,
+          fn = statistic
+        )
+      ) %>%
+      unnest(model) %>%
+      rename(estimate = model)
+    values$boot_stat = mean(values$boot_reps$estimate)
+    
+    # Navigate to results
+    updateTabsetPanel(session, "wizard", selected = "boot_results")
+    remove_modal_spinner()
+  })
+  observeEvent(input$settings_previous, {
+    updateTabsetPanel(session, "wizard", selected = "data_upload")
+  })
+  # Bootstrap results page -----------------------------------------------------
+  observeEvent(input$boot_results_next, {
+    # Show busy dialog
+    show_modal_spinner(
+      spin = "swapping-squares",
+      text = "Searching for outliers..."
+    )
+    # Check for outliers
+    values$jab_values = jackknife_after_bootstrap(values$boot_reps)
+    values$jab_uncertainty = get_uncertainty_bands(
+                               values$boot_reps,
+                               values$jab_values
+                             )
+    # Navigate to outlier page
+    updateTabsetPanel(session, "wizard", selected = "outlier_detection")
+    remove_modal_spinner()
+  })
+  observeEvent(input$boot_results_previous, {
+    updateTabsetPanel(session, "wizard", selected = "settings")
+  })
+  
   # Data ingest ================================================================
   observeEvent(input$user_file, {
     # Check that file is a CSV; reject if not
@@ -18,6 +96,20 @@ shinyServer(function(input, output, session) {
   })
   
   # UI objects =================================================================
+  # Data page conditional action button ----------------------------------------
+  output$data_upload_next = renderUI({
+    ui = NULL
+    if (!is.null(values$user_file)) {
+      ui = fluidRow(
+        column(width = 12,
+          hr(),
+          actionButton("data_upload_next", "Next", width = "100%")
+        )
+      )
+    }
+    return(ui)
+  })
+  
   # Statistic selection --------------------------------------------------------
   output$select_variable = renderUI({
     # Get variables from loaded data, if present
@@ -36,44 +128,7 @@ shinyServer(function(input, output, session) {
   
   # Bootstrap procedure ========================================================
   observeEvent(input$go, {
-    # Store settings for reporting
-    values$param_B = input$param_B
-    values$param_statistic = input$param_statistic
-    values$param_variable = input$param_variable
     
-    # Generate bootstrap samples
-    values$boot_samples = bootstraps(
-                            values$user_file,
-                            times = values$param_B,
-                            apparent=TRUE
-                          )
-    
-    # Helper function to compute statistic
-    compute_statistic = function(split, variable, fn) {
-      analysis(split) %>%
-        pull(as.name(variable)) %>%
-        fn(na.rm = TRUE)
-    }
-    
-    # Compute statistic on boostrap samples
-    statistic = switch(values$param_statistic,
-                  "Mean" = mean,
-                  "Median" = median
-                )
-    values$boot_reps = values$boot_samples %>%
-      mutate(
-        model = map(
-          splits,
-          compute_statistic,
-          variable = values$param_variable,
-          fn = statistic
-        )
-      ) %>%
-      unnest(model) %>%
-      rename(estimate = model)
-    
-    # Compute mean estimate
-    values$boot_stat = mean(values$boot_reps$estimate)
     
     # Jackknife-after-bootstrap for outlier detection
     values$jab_values = jackknife_after_bootstrap(values$boot_reps)
@@ -85,7 +140,7 @@ shinyServer(function(input, output, session) {
   
   # Results ====================================================================
   # Histogram ------------------------------------------------------------------
-  output$boots_histogram = renderPlotly({
+  output$results_hist = renderPlotly({
     # Compute pivot confidence interval bounds
     upper_quantile = quantile(
                        values$boot_reps$estimate,
@@ -118,7 +173,7 @@ shinyServer(function(input, output, session) {
   })
   
   # Numeric results ------------------------------------------------------------
-  output$boots_results = renderUI({
+  output$results_summary = renderUI({
     fluidRow(
       column(width=12, align="center",
         h2("Bootstrap Results"),
