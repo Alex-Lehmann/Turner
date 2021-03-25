@@ -8,10 +8,12 @@ shinyServer(function(input, output, session) {
   observeEvent(input$welcome_next, {
     updateTabsetPanel(session, "wizard", selected = "data_upload")
   })
+  
   # Data upload page -----------------------------------------------------------
   observeEvent(input$data_upload_next, {
     updateTabsetPanel(session, "wizard", selected = "settings")
   })
+  
   # Settings page --------------------------------------------------------------
   observeEvent(input$settings_next, {
     # Show busy dialog
@@ -39,6 +41,7 @@ shinyServer(function(input, output, session) {
   observeEvent(input$settings_previous, {
     updateTabsetPanel(session, "wizard", selected = "data_upload")
   })
+  
   # Bootstrap results page -----------------------------------------------------
   observeEvent(input$boot_results_next, {
     # Show busy dialog
@@ -60,6 +63,15 @@ shinyServer(function(input, output, session) {
   
   observeEvent(input$boot_results_previous, {
     updateTabsetPanel(session, "wizard", selected = "settings")
+  })
+  
+  # Outlier detection page -----------------------------------------------------
+  observeEvent(input$outliers_next, {
+    
+  })
+  
+  observeEvent(input$outliers_previous, {
+    updateTabsetPanel(session, "wizard", selected = "boot_results")
   })
   
   # Data ingest ================================================================

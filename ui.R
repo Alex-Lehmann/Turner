@@ -37,7 +37,7 @@ shinyUI(fluidPage(
         tabPanelBody("data_upload",
           titlePanel("Data"),
           fileInput("user_file", "Upload your data as a CSV", accept = ".csv"),
-          DT::dataTableOutput("data_preview"),
+          dataTableOutput("data_preview"),
           uiOutput("data_upload_next")
         ),
         
@@ -70,7 +70,6 @@ shinyUI(fluidPage(
         tabPanelBody("boot_results",
           titlePanel("Preliminary Results"),
           # Results ------------------------------------------------------------
-          
           plotlyOutput("results_hist"),
           sliderInput("ci_alpha",
             "Confidence level:",
@@ -92,9 +91,19 @@ shinyUI(fluidPage(
         ),
         
         tabPanelBody("outlier_detection",
+          # Outlier detection controls -----------------------------------------
           titlePanel("Outliers"),
           plotlyOutput("jab_plot"),
-          DT::dataTableOutput("outliers")
+          dataTableOutput("outliers"),
+          # Navigation ---------------------------------------------------------
+          fluidRow(
+            column(width = 6,
+              actionButton("outliers_previous", "Previous", width = "100%")
+            ),
+            column(width = 6,
+              actionButton("outliers_next", "Next", width = "100%")
+            )
+          )
         )
       )
     )
