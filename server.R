@@ -266,8 +266,35 @@ shinyServer(function(input, output, session) {
   }, selection = list(selected = 1:length(values$outliers)),
      options = list(scrollX = TRUE, ordering = FALSE))
   
-  # EHs for outlier point selection --------------------------------------------
-  observe({
+  # EHs for outlier point selection --------------------------------------------}
+  # From plot
+  observeEvent(event_data("plotly_click"), {
+    clicked_marker = event_data("plotly_click")
+    print(clicked_marker)
+    
+    # Check if clicked marker is an outlier
+    click_id = clicked_marker$customdata
+    if (is.null(click_id)) return()
+    
+    table_ids = values$outlier_table$row_id
+    if (click_id %in% table_ids) {
+      selection_ids = table_ids[input$outliers_rows_selected]
+      if (click_id %in% selection_ids) {
+        # If case is selected, deselect
+        selection_index = which(selection_ids == click_id)
+        dataTableProxy("outliers") %>%
+          selectRows(input$outliers_rows_selected[-selection_index])
+      } else {
+        # If case is not selected, select
+        click_index = which(table_ids == click_id)
+        dataTableProxy("outliers") %>%
+          selectRows(c(input$outliers_rows_selected, click_index))
+      }
+    }
+  })
+  
+  # From table
+  observeEvent(input$outliers_rows_selected, ignoreNULL = FALSE, {
     if (!is.null(input$outliers_rows_selected)) {
       # Make new vertical lines
       vlines = values$jab_values %>%
