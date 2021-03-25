@@ -170,10 +170,11 @@ shinyServer(function(input, output, session) {
     fig = plot_ly(type = "scatter", showlegend = FALSE) %>%
       layout(
         title = "Jackknife-After-Bootstrap Plot",
-        xaxis = list(title = "Relative Influence"),
+        xaxis = list(title = "Relative Influence", zeroline = FALSE),
         yaxis = list(title = "Value")
       ) %>%
-      config(displayModeBar = FALSE)
+      config(displayModeBar = FALSE) %>%
+      event_register("plotly_click")
     
     for (q in str_subset(colnames(values$jab_values), "^quantile_")) {
       # Extract quantile value from name
@@ -183,7 +184,8 @@ shinyServer(function(input, output, session) {
       
       # Sorted tibble to trace
       jack_data = values$jab_values %>%
-        mutate(outlier = ifelse(deleted_case %in% values$outliers,
+        mutate(outlier = ifelse(
+                           deleted_case %in% values$outliers,
                            TRUE, FALSE
                          )
                ) %>%
@@ -197,7 +199,7 @@ shinyServer(function(input, output, session) {
                                quantile == quantile_prob
                              )
       x = values$jab_values$rel_influence
-      x_bounds = c(min(x), max(x))
+      x_bounds = c(min(x), max(x)) * 1.05
       uncertainty_data = tibble(
                            x = x_bounds,
                            quantile = rep(uncertainty_interval$full_quantile,2),
@@ -232,13 +234,14 @@ shinyServer(function(input, output, session) {
         # Jackknife quantiles
         add_trace(
           data = jack_data,
+          name = paste0(quantile_prob * 100, "% quantile"),
           x = ~x,
           y = ~y,
-          name = paste0(quantile_prob * 100, "% quantile"),
           mode = "markers", marker = list(size = 10),
-          symbol = ~outlier, symbols = c("o", "x"),
+          symbol = ~outlier, symbols = c("o", "x-thin"),
           color = "orange",
-          hovertemplate = "Influence: %{x}<br>Value: %{y}"
+          customdata = ~deleted_case,
+          hovertemplate = "ID: %{customdata}<br>Influence: %{x}<br>Value: %{y}"
         ) %>%
         add_trace(
           data = jack_data,
@@ -257,8 +260,32 @@ shinyServer(function(input, output, session) {
   # Outlier display ------------------------------------------------------------
   output$outliers = DT::renderDataTable({
     if (length(values$outliers > 0)){
-      values$user_file %>%
+      values$outlier_table = values$user_file %>%
         filter(row_id %in% values$outliers)
     } else NULL
+  }, selection = list(selected = 1:length(values$outliers)),
+     options = list(scrollX = TRUE, ordering = FALSE))
+  
+  # EHs for outlier point selection --------------------------------------------
+  observe({
+    if (!is.null(input$outliers_rows_selected)) {
+      # Make new vertical lines
+      vlines = values$jab_values %>%
+        filter(deleted_case %in% values$outliers) %>%
+        slice(input$outliers_rows_selected) %>%
+        pull(rel_influence) %>%
+        make_vlines()
+    } else vlines = NULL
+    
+    # Update layout without any vertical lines
+    plotlyProxy("jab_plot", session) %>%
+      plotlyProxyInvoke("relayout",
+        list(
+          title = "Jackknife-After-Bootstrap Plot",
+          xaxis = list(title = "Relative Influence", zeroline = FALSE),
+          yaxis = list(title = "Value"),
+          shapes = vlines
+        )
+      )
   })
 })
