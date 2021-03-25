@@ -28,8 +28,8 @@ shinyServer(function(input, output, session) {
       B = input$param_B,
       fn = input$param_statistic,
       variable = input$param_variable)
-    values$boot_reps = boot_results$reps
-    values$boot_stat = boot_results$stat
+    values$boot_reps0 = boot_results$reps
+    values$boot_stat0 = boot_results$stat
     
     # Navigate to results
     updateTabsetPanel(session, "wizard", selected = "boot_results")
@@ -47,9 +47,9 @@ shinyServer(function(input, output, session) {
       text = "Searching for outliers..."
     )
     # Check for outliers
-    values$jab_values = jackknife_after_bootstrap(values$boot_reps)
+    values$jab_values = jackknife_after_bootstrap(values$boot_reps0)
     values$jab_uncertainty = get_uncertainty_bands(
-                               values$boot_reps,
+                               values$boot_reps0,
                                values$jab_values
                              )
     values$outliers = check_outliers(values$jab_values, values$jab_uncertainty)
@@ -110,55 +110,99 @@ shinyServer(function(input, output, session) {
   # Results ====================================================================
   # Histogram ------------------------------------------------------------------
   output$results_hist = renderPlotly({
+    # Compute density
+    density = density(values$boot_reps0$estimate)
+    
     # Compute pivot confidence interval bounds
     upper_quantile = quantile(
-                       values$boot_reps$estimate,
+                       values$boot_reps0$estimate,
                        probs = 1 - (input$ci_alpha / 2),
                        na.rm = TRUE
                      )
     lower_quantile = quantile(
-                       values$boot_reps$estimate,
+                       values$boot_reps0$estimate,
                        probs = input$ci_alpha / 2,
                        na.rm = TRUE
                      )
     values$ci = tibble(
-                  estimate = values$boot_stat,
-                  upper = 2 * values$boot_stat - lower_quantile,
-                  lower = 2 * values$boot_stat - upper_quantile
+                  estimate = values$boot_stat0,
+                  upper = 2 * values$boot_stat0 - lower_quantile,
+                  lower = 2 * values$boot_stat0 - upper_quantile
                 )
     
+    # Generate lines for confidence interval
+    ci_vector = unlist(values$ci)
+    vlines = make_vlines(ci_vector[1], dash = "dash") %>% 
+      append(make_vlines(ci_vector[2:3], color = "blue", dash = "dash"))
+    
     # Generate plot
-    fig = ggplot() +
-      geom_histogram(values$boot_reps, mapping = aes(estimate)) +
-      geom_vline(
-        values$ci,
-        mapping = aes(xintercept = estimate, color = "Mean")) +
-      geom_vline(values$ci, mapping = aes(xintercept = upper, color = "CI")) +
-      geom_vline(values$ci, mapping = aes(xintercept = lower, color = "CI")) +
-      ggtitle("Histogram of Bootstrap Estimates, with Pivot CI") +
-      xlab(paste0("Bootstrap Estimate of ", input$param_statistic)) +
-      ylab("Count")
-    ggplotly(fig)
+    fig = plot_ly() %>%
+      config(displayModeBar = FALSE) %>%
+      
+      # Density
+      add_trace(
+        name = "Density",
+        type = "scatter",
+        mode = "lines",
+        x = density$x, y = density$y,
+        yaxis = "y2",
+        fill = "tozeroy",
+        hoverinfo = "skip"
+      ) %>%
+      
+      # Histogram
+      add_trace(
+        name = "Histogram",
+        type = "histogram",
+        data = values$boot_reps0,
+        x = ~estimate,
+        hovertemplate = "Bin range: %{x}<br>Estimates: %{y}<extra></extra>"
+      ) %>%
+      
+      # Layout
+      layout(
+        title = "Bootstrap Estimates with Pivot Confidence Interval",
+        xaxis = list(title = "Bootstrap Estimate", fixedrange = TRUE),
+        yaxis = list(title = "Count", fixedrange = TRUE),
+        yaxis2 = list(
+                   overlaying = "y",
+                   side = "right",
+                   title = "Density",
+                   fixedrange = TRUE
+                 ),
+        shapes = vlines
+      )
+    
+    fig
   })
   
   # Numeric results ------------------------------------------------------------
   output$results_summary = renderUI({
+    # Maximum decimals in passed data for rounding purposes
+    decimals = values$user_file %>%
+      pull(as.name(values$param_variable)) %>%
+      count_decimals() %>%
+      max()
+    
     fluidRow(
-      column(width=12, align="center",
-        h2("Bootstrap Results"),
+      # Summary statistics -----------------------------------------------------
+      column(width = 6, align = "center",
+        h3("Mean Estimate"),
+        h4(round(values$boot_stat0, decimals + 1)),
+        h3("Standard Error"),
+        h4(round(sd(values$boot_reps0$estimate), decimals + 1))
+      ),
+      # Confidence interval ----------------------------------------------------
+      column(width = 6, align = "center",
+        h3(paste0((1 - input$ci_alpha) * 100), "% Pivot Confidence Interval"),
+        h4(paste0(
+             "(", round(values$ci$lower, decimals + 1)
+             , ", ", 
+             round(values$ci$upper, decimals + 1), ")")
+        ),
         
-        # Estimates ------------------------------------------------------------
-        h3("Estimate"),
-        h4(values$boot_stat),
-        h3(paste0((1 - input$ci_alpha)*100, "% Pivot CI")),
-        h4(paste0("(", values$ci$lower, ", ", values$ci$upper, ")")),
-        
-        # Settings -------------------------------------------------------------
-        HTML("<br>"),
-        h3("Settings"),
-        h4(paste0(values$param_B, " samples")),
-        h4(paste0("Statistic: ", values$param_statistic)),
-        h4(paste0("Variable: ", values$param_variable))
+        h3("Skewness"),
+        h4(round(skewness(values$boot_reps0$estimate), decimals + 3))
       )
     )
   })
@@ -173,8 +217,7 @@ shinyServer(function(input, output, session) {
         xaxis = list(title = "Relative Influence", zeroline = FALSE),
         yaxis = list(title = "Value")
       ) %>%
-      config(displayModeBar = FALSE) %>%
-      event_register("plotly_click")
+      config(displayModeBar = FALSE)
     
     for (q in str_subset(colnames(values$jab_values), "^quantile_")) {
       # Extract quantile value from name
@@ -231,6 +274,7 @@ shinyServer(function(input, output, session) {
           fill = "tonexty", fillcolor = "rgba(0, 0, 0, 0.2)",
           hoverinfo = "skip"
         ) %>%
+        
         # Jackknife quantiles
         add_trace(
           data = jack_data,
@@ -270,7 +314,6 @@ shinyServer(function(input, output, session) {
   # From plot
   observeEvent(event_data("plotly_click"), {
     clicked_marker = event_data("plotly_click")
-    print(clicked_marker)
     
     # Check if clicked marker is an outlier
     click_id = clicked_marker$customdata
@@ -301,7 +344,7 @@ shinyServer(function(input, output, session) {
         filter(deleted_case %in% values$outliers) %>%
         slice(input$outliers_rows_selected) %>%
         pull(rel_influence) %>%
-        make_vlines()
+        make_vlines(dash = "dot")
     } else vlines = NULL
     
     # Update layout without any vertical lines

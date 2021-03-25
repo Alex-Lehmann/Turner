@@ -70,7 +70,7 @@ shinyUI(fluidPage(
         tabPanelBody("boot_results",
           titlePanel("Preliminary Results"),
           # Results ------------------------------------------------------------
-          uiOutput("results_summary"),
+          
           plotlyOutput("results_hist"),
           sliderInput("ci_alpha",
             "Confidence level:",
@@ -79,6 +79,7 @@ shinyUI(fluidPage(
             ticks = FALSE,
             width = "100%"
           ),
+          uiOutput("results_summary"),
           # Navigation ---------------------------------------------------------
           fluidRow(
             column(width = 6,
