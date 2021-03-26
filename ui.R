@@ -69,16 +69,7 @@ shinyUI(fluidPage(
         # Bootstrap results page ===============================================
         tabPanelBody("boot_results",
           titlePanel("Preliminary Results"),
-          # Results ------------------------------------------------------------
-          plotlyOutput("results_hist"),
-          sliderInput("ci_alpha",
-            "Confidence level:",
-            min = 0.01, max = 0.15,
-            value = 0.05,
-            ticks = FALSE,
-            width = "100%"
-          ),
-          uiOutput("results_summary"),
+          boot_results_ui("prelim"),
           # Navigation ---------------------------------------------------------
           fluidRow(
             column(width = 6,
