@@ -13,7 +13,10 @@ shinyUI(fluidPage(
               fluidRow(width=12, align="center",
                 HTML("<script type='text/javascript' src='https://platform.linkedin.com/badges/js/profile.js' async defer></script><div class='LI-profile-badge'  data-version='v1' data-size='medium' data-locale='en_US' data-type='vertical' data-theme='light' data-vanity='alex-lehmann-ds'><a class='LI-simple-link' href='https://ca.linkedin.com/in/alex-lehmann-ds?trk=profile-badge'>Alex Lehmann</a></div>"),
                 HTML("<br><b>Email: </b><a href='mailto:alex.lehmann@cmail.carleton.ca'>alex.lehmann@cmail.carleton.ca</a>")
-              )
+              ),
+              
+              titlePanel("Source"),
+              HTML("<a href='https://github.com/Alex-Lehmann/Turner'>View the full source code on GitHub.</a>")
             ),
             
             # Intro panel ------------------------------------------------------
@@ -92,7 +95,7 @@ shinyUI(fluidPage(
               actionButton("outliers_previous", "Previous", width = "100%")
             ),
             column(width = 6,
-              actionButton("outliers_next", "Next", width = "100%")
+              #actionButton("outliers_next", "Next", width = "100%")
             )
           )
         )
