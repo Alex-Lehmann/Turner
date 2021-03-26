@@ -98,7 +98,7 @@ shinyServer(function(input, output, session) {
   })
   
   observeEvent(input$outliers_previous, {
-    updateTabsetPanel(session, "wizard", selected = "boot_results")
+    updateTabsetPanel(session, "wizard", selected = "prelim_results")
   })
   
   # Data ingest ================================================================
