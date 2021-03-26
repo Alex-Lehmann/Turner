@@ -126,20 +126,11 @@ shinyServer(function(input, output, session) {
     density = density(values$boot_reps0$estimate)
     
     # Compute pivot confidence interval bounds
-    upper_quantile = quantile(
-                       values$boot_reps0$estimate,
-                       probs = 1 - (input$ci_alpha / 2),
-                       na.rm = TRUE
-                     )
-    lower_quantile = quantile(
-                       values$boot_reps0$estimate,
-                       probs = input$ci_alpha / 2,
-                       na.rm = TRUE
-                     )
+    ci_values = make_pivot_ci(values$boot_reps0, "estimate", input$ci_alpha)
     values$ci = tibble(
-                  estimate = values$boot_stat0,
-                  upper = 2 * values$boot_stat0 - lower_quantile,
-                  lower = 2 * values$boot_stat0 - upper_quantile
+                  estimate = ci_values[1],
+                  lower = ci_values[2],
+                  upper = ci_values[3]
                 )
     
     # Generate lines for confidence interval

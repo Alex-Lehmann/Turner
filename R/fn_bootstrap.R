@@ -25,6 +25,20 @@ do_bootstrap = function(df, B, fn, variable) {
   return(list(reps = reps, stat = boot_stat))
 }
 
+# Builds a pivot confidence interval at the specified confidence level
+make_pivot_ci = function(df, variable, alpha) {
+  v = df[[variable]]
+  
+  # Compute upper and lower quantiles
+  upper_quantile = quantile(v, probs = 1 - (alpha / 2), na.rm = TRUE)
+  lower_quantile = quantile(v, probs = alpha / 2, na.rm = TRUE)
+  
+  # Compute CI
+  center = mean(v)
+  ci = c(center, (2 * center) - c(upper_quantile, lower_quantile))
+  return(ci)
+}
+
 # Helpers ======================================================================
 # Selects functino to apply ----------------------------------------------------
 select_fn = function(fn) {
