@@ -69,8 +69,8 @@ shinyUI(fluidPage(
           )
         ),
         
-        # Bootstrap results page ===============================================
-        tabPanelBody("boot_results",
+        # Preliminary results page =============================================
+        tabPanelBody("prelim_results",
           titlePanel("Preliminary Results"),
           boot_results_ui("prelim"),
           # Navigation ---------------------------------------------------------
@@ -84,6 +84,7 @@ shinyUI(fluidPage(
           )
         ),
         
+        # Outlier detection ====================================================
         tabPanelBody("outlier_detection",
           # Outlier detection controls -----------------------------------------
           titlePanel("Outliers"),
@@ -98,6 +99,17 @@ shinyUI(fluidPage(
               #actionButton("outliers_next", "Next", width = "100%")
             )
           )
+        ),
+        
+        # Outlier-removed results page =========================================
+        tabPanelBody("outlier_results",
+          titlePanel("Results with Selected Outliers Removed"),
+          boot_results_ui("outliers")
+        ),
+        
+        # Next page ============================================================
+        tabPanelBody("next_page",
+          
         )
       )
     )

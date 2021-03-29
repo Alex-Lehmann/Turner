@@ -14,15 +14,17 @@ boot_results_ui = function(id) {
   )
 }
 
-boot_results_server = function(id, values) {
+boot_results_server = function(id, values, i) {
   moduleServer(id, function(input, output, session) {
     # Histogram ----------------------------------------------------------------
     output$results_hist = renderPlotly({
+      boot_reps = values[[paste0("boot_reps", i)]]
+      print(boot_reps)
       # Compute density
-      density = density(values$boot_reps0$estimate)
+      density = density(boot_reps$estimate)
       
       # Compute pivot confidence interval bounds
-      ci_values = make_pivot_ci(values$boot_reps0, "estimate", input$ci_alpha)
+      ci_values = make_pivot_ci(boot_reps, "estimate", input$ci_alpha)
       values$ci = tibble(
         estimate = ci_values[1],
         lower = ci_values[2],
@@ -53,7 +55,7 @@ boot_results_server = function(id, values) {
         add_trace(
           name = "Histogram",
           type = "histogram",
-          data = values$boot_reps0,
+          data = boot_reps,
           x = ~estimate,
           hovertemplate = "Bin range: %{x}<br>Estimates: %{y}<extra></extra>"
         ) %>%
@@ -77,8 +79,11 @@ boot_results_server = function(id, values) {
     
     # Numeric results ----------------------------------------------------------
     output$results_summary = renderUI({
+      boot_reps = values[[paste0("boot_reps", i)]]
+      user_file = values[[paste0("user_file", i)]]
+      boot_stat = values[[paste0("boot_stat", i)]]
       # Maximum decimals in passed data for rounding purposes
-      decimals = values$user_file %>%
+      decimals = user_file %>%
         pull(as.name(values$param_variable)) %>%
         count_decimals() %>%
         max()
@@ -87,10 +92,10 @@ boot_results_server = function(id, values) {
         # Summary statistics ---------------------------------------------------
         column(width = 6, align = "center",
           h3("Mean Estimate"),
-          h4(round(values$boot_stat0, decimals + 1)),
+          h4(round(boot_stat, decimals + 1)),
           
           h3("Standard Error"),
-          h4(round(sd(values$boot_reps0$estimate), decimals + 1))
+          h4(round(sd(boot_reps$estimate), decimals + 1))
         ),
         # Confidence interval --------------------------------------------------
         column(width = 6, align = "center",
@@ -103,7 +108,7 @@ boot_results_server = function(id, values) {
           ),
           
           h3("Skewness"),
-          h4(round(skewness(values$boot_reps0$estimate), decimals + 3))
+          h4(round(skewness(boot_reps$estimate), decimals + 3))
         )
       )
     })

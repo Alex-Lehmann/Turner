@@ -26,15 +26,15 @@ shinyServer(function(input, output, session) {
     
     # Resample
     boot_results = do_bootstrap(
-      values$user_file,
-      B = input$param_B,
-      fn = input$param_statistic,
-      variable = input$param_variable)
+      values$user_file0,
+      B = values$param_B,
+      fn = values$param_statistic,
+      variable = values$param_variable)
     values$boot_reps0 = boot_results$reps
     values$boot_stat0 = boot_results$stat
     
     # Navigate to results
-    updateTabsetPanel(session, "wizard", selected = "boot_results")
+    updateTabsetPanel(session, "wizard", selected = "prelim_results")
     remove_modal_spinner()
   })
   
@@ -67,11 +67,43 @@ shinyServer(function(input, output, session) {
   
   # Outlier detection page -----------------------------------------------------
   observeEvent(input$outliers_next, {
-    
+    if (is.null(input$outliers_rows_selected)) {
+      # Do nothing if no outliers are selected
+      values$user_file1 = values$user_file0
+      values$boot_reps1 = values$boot_reps0
+      values$boot_stat1 = values$boot_stat0
+      
+      # Navigate
+      updateTabsetPanel(session, "wizard", selected = "next_page")
+    }
+    else {
+      # Show busy dialog
+      show_modal_spinner(spin = "swapping-squares", text = "Updating...")
+      
+      # Remove selected outliers
+      remove_ids = values$outlier_table %>%
+        slice(input$outliers_rows_selected) %>%
+        pull(row_id)
+      values$user_file1 = filter(values$user_file0, !row_id %in% remove_ids)
+      
+      # Bootstrap outlier-removed data
+      boot_results = do_bootstrap(
+        values$user_file1,
+        B = values$param_B,
+        fn = values$param_statistic,
+        variable = values$param_variable
+      )
+      values$boot_reps1 = boot_results$reps
+      values$boot_stat1 = boot_results$stat
+      
+      # Navigate to results
+      updateTabsetPanel(session, "wizard", selected = "outlier_results")
+      remove_modal_spinner()
+    }
   })
   
   observeEvent(input$outliers_previous, {
-    updateTabsetPanel(session, "wizard", selected = "boot_results")
+    updateTabsetPanel(session, "wizard", selected = "prelim_results")
   })
   
   # Data ingest ================================================================
@@ -84,7 +116,7 @@ shinyServer(function(input, output, session) {
     } else {
       # Add row IDs
       df = readr::read_csv(path, col_types=cols())
-      values$user_file = mutate(df, row_id = 1:nrow(df))
+      values$user_file0 = mutate(df, row_id = 1:nrow(df))
     }
   })
   
@@ -92,13 +124,13 @@ shinyServer(function(input, output, session) {
   # Data preview ---------------------------------------------------------------
   output$data_preview = DT::renderDataTable({
     # Don't display table until something is loaded
-    if (is.null(values$user_file)) return(NULL) else return(values$user_file)
+    if (is.null(values$user_file0)) return(NULL) else return(values$user_file0)
   }, options=list(scrollX=TRUE))
   
   # Data page conditional action button ----------------------------------------
   output$data_upload_next = renderUI({
     ui = NULL
-    if (!is.null(values$user_file)) {
+    if (!is.null(values$user_file0)) {
       ui = fluidRow(
         column(width = 12,
           hr(),
@@ -112,7 +144,7 @@ shinyServer(function(input, output, session) {
   # Statistic selection --------------------------------------------------------
   output$select_variable = renderUI({
     # Get variables from loaded data, if present
-    if (!is.null(values$user_file)) choices = colnames(values$user_file)
+    if (!is.null(values$user_file0)) choices = colnames(values$user_file0)
     else choices = NULL
     
     # Generate input
@@ -120,7 +152,8 @@ shinyServer(function(input, output, session) {
   })
   
   # Bootstrap results ==========================================================
-  boot_results_server("prelim", values)
+  boot_results_server("prelim", values, 0)
+  boot_results_server("outliers", values, 1)
   
   # Outlier detection ==========================================================
   # Jackknife-after-bootstrap plot ---------------------------------------------
@@ -219,7 +252,7 @@ shinyServer(function(input, output, session) {
   # Outlier display ------------------------------------------------------------
   output$outliers = DT::renderDataTable({
     if (length(values$outliers > 0)){
-      values$outlier_table = values$user_file %>%
+      values$outlier_table = values$user_file0 %>%
         filter(row_id %in% values$outliers)
     } else NULL
   }, selection = list(selected = 1:length(values$outliers)),
