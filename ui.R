@@ -57,6 +57,13 @@ shinyUI(fluidPage(
           ),
           selectInput("param_statistic", "Statistic:", c("Mean")),
           uiOutput("select_variable"),
+          numericInput(
+            "param_seed",
+            "Random Seed",
+            min = 0,
+            value = NULL,
+            step = 1
+          ),
           hr(),
           # Navigation ---------------------------------------------------------
           fluidRow(

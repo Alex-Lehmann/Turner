@@ -23,13 +23,16 @@ shinyServer(function(input, output, session) {
     values$param_B = input$param_B
     values$param_statistic = input$param_statistic
     values$param_variable = input$param_variable
+    values$param_seed = input$param_seed
     
     # Resample
     boot_results = do_bootstrap(
       values$user_file0,
       B = values$param_B,
       fn = values$param_statistic,
-      variable = values$param_variable)
+      variable = values$param_variable,
+      seed = values$param_seed
+    )
     values$boot_reps0 = boot_results$reps
     values$boot_stat0 = boot_results$stat
     
@@ -91,7 +94,8 @@ shinyServer(function(input, output, session) {
         values$user_file1,
         B = values$param_B,
         fn = values$param_statistic,
-        variable = values$param_variable
+        variable = values$param_variable,
+        seed = values$param_seed
       )
       values$boot_reps1 = boot_results$reps
       values$boot_stat1 = boot_results$stat
