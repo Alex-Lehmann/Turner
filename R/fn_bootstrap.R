@@ -1,5 +1,9 @@
 # Performs nonparametric bootstrap resampling
-do_bootstrap = function(df, B, fn, variable) {
+do_bootstrap = function(df, B, fn, variable, seed) {
+  # Random seed
+  if (is.na(seed)) set.seed(NULL)
+  else set.seed(seed)
+  
   # Generate bootstrap samples
   boot_samples = bootstraps(df, times = B, apparent = TRUE)
   
