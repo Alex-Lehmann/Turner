@@ -19,7 +19,7 @@ boot_results_server = function(id, values, i) {
     # Histogram ----------------------------------------------------------------
     output$results_hist = renderPlotly({
       boot_reps = values[[paste0("boot_reps", i)]]
-      
+      print(boot_reps)
       # Compute density
       density = density(boot_reps$estimate)
       

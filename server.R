@@ -70,6 +70,8 @@ shinyServer(function(input, output, session) {
     if (is.null(input$outliers_rows_selected)) {
       # Do nothing if no outliers are selected
       values$user_file1 = values$user_file0
+      values$boot_reps1 = values$boot_reps0
+      values$boot_stat1 = values$boot_stat0
     }
     else {
       # Show busy dialog

@@ -100,7 +100,7 @@ shinyUI(fluidPage(
         
         # Outlier-removed results page =========================================
         tabPanelBody("outlier_results",
-          titlePanel("Results with Outliers Removed"),
+          titlePanel("Results with Selected Outliers Removed"),
           boot_results_ui("outliers")
         )
       )
