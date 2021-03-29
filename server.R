@@ -72,6 +72,9 @@ shinyServer(function(input, output, session) {
       values$user_file1 = values$user_file0
       values$boot_reps1 = values$boot_reps0
       values$boot_stat1 = values$boot_stat0
+      
+      # Navigate
+      updateTabsetPanel(session, "wizard", selected = "next_page")
     }
     else {
       # Show busy dialog
@@ -92,11 +95,11 @@ shinyServer(function(input, output, session) {
       )
       values$boot_reps1 = boot_results$reps
       values$boot_stat1 = boot_results$stat
+      
+      # Navigate to results
+      updateTabsetPanel(session, "wizard", selected = "outlier_results")
+      remove_modal_spinner()
     }
-    
-    # Navigate to results
-    updateTabsetPanel(session, "wizard", selected = "outlier_results")
-    remove_modal_spinner()
   })
   
   observeEvent(input$outliers_previous, {
