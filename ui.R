@@ -96,7 +96,7 @@ shinyUI(fluidPage(
               actionButton("outliers_previous", "Previous", width = "100%")
             ),
             column(width = 6,
-              #actionButton("outliers_next", "Next", width = "100%")
+              actionButton("outliers_next", "Next", width = "100%")
             )
           )
         ),
