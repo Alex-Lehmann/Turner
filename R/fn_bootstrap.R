@@ -1,21 +1,36 @@
-# Performs nonparametric bootstrap resampling
+# Performs nonparametric bootstrap resampling ----------------------------------
 do_bootstrap = function(df, B, fn, variable, seed) {
   # Random seed
   if (is.na(seed)) set.seed(NULL)
   else set.seed(seed)
   
-  # Generate bootstrap samples
-  boot_samples = bootstraps(df, times = B, apparent = TRUE)
+  # Generate bootstrap samples; smooth if statistic demands it
+  boot_samples = bootstraps(df, times = B, apparent = TRUE) %>%
+    mutate(splits,
+      sample = map(splits,
+                 ~.x %>%
+                   analysis() %>%
+                   select(variable)
+               )
+    )
+  if (fn %in% c("Median")) {
+    boot_samples = mutate(boot_samples,
+                     sample = map(sample,
+                                ~.x + matrix(
+                                        rnorm(nrow(.x)*ncol(.x)),
+                                        ncol = ncol(.x)
+                                      )
+                              )
+                   )
+  }
   
   # Compute statistic on bootstrap samples
   statistic = select_fn(fn)
   reps = boot_samples %>%
     mutate(
-      estimate = map(
-                   splits,
-                   function(split, fn, variable) {
-                     split %>%
-                       analysis() %>%
+      estimate = map(sample,
+                   function(sample, fn, variable) {
+                     sample %>%
                        pull(as.name(variable)) %>%
                        fn()
                    },
@@ -25,11 +40,11 @@ do_bootstrap = function(df, B, fn, variable, seed) {
     ) %>%
     unnest(estimate)
   boot_stat = mean(reps$estimate)
-
+  
   return(list(reps = reps, stat = boot_stat))
 }
 
-# Builds a pivot confidence interval at the specified confidence level
+# Builds a pivot confidence interval at the specified confidence level ---------
 make_pivot_ci = function(df, variable, alpha) {
   v = df[[variable]]
   
@@ -47,6 +62,7 @@ make_pivot_ci = function(df, variable, alpha) {
 # Selects functino to apply ----------------------------------------------------
 select_fn = function(fn) {
   switch(fn,
-         "Mean" = mean
+         "Mean" = mean,
+         "Median" = median
   )
 }
