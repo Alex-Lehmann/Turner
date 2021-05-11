@@ -55,7 +55,7 @@ shinyUI(fluidPage(
             value=1000,
             step=1,
           ),
-          selectInput("param_statistic", "Statistic:", c("Mean")),
+          selectInput("param_statistic", "Statistic:", c("Mean", "Median")),
           uiOutput("select_variable"),
           numericInput(
             "param_seed",
