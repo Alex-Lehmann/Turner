@@ -59,7 +59,7 @@ make_pivot_ci = function(df, variable, alpha) {
 }
 
 # Helpers ======================================================================
-# Selects functino to apply ----------------------------------------------------
+# Selects function to apply ----------------------------------------------------
 select_fn = function(fn) {
   switch(fn,
          "Mean" = mean,
