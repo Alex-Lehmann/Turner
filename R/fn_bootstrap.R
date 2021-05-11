@@ -10,7 +10,7 @@ do_bootstrap = function(df, B, fn, variable, seed) {
       sample = map(splits,
                  ~.x %>%
                    analysis() %>%
-                   select(variable)
+                   select(all_of(variable))
                )
     )
   if (fn %in% c("Median")) {
