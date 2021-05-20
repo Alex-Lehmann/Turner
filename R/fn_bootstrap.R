@@ -1,68 +1,66 @@
-# Performs nonparametric bootstrap resampling ----------------------------------
-do_bootstrap = function(df, B, fn, variable, seed) {
-  # Random seed
-  if (is.na(seed)) set.seed(NULL)
-  else set.seed(seed)
+# Resampling operation =========================================================
+do_bootstrap <- function(df, B, spec) {
+  # Select bootstrap procedure and generate bootstrap samples
+  if (spec$stat %in% "Median") boot_proc <- resample_smooth
+  else boot_proc <- resample_cases
+  boot_samples <- boot_proc(df, B, spec)
   
-  # Generate bootstrap samples; smooth if statistic demands it
-  boot_samples = bootstraps(df, times = B, apparent = TRUE) %>%
-    mutate(splits,
+  # Select evaluation method and compute bootstrap replications
+  eval_stat <- switch(spec$stat,
+                 "Mean" = eval_mean,
+                 "Median" = eval_median,
+                 "Correlation" = eval_correlation
+  )
+  boot_reps <- eval_stat(boot_samples, spec)
+  
+  return(boot_reps)
+}
+
+# Bootstrap procedures #########################################################
+# Basic case resampling ========================================================
+resample_cases <- function(df, B, spec) {
+  bootstraps(df, times = B, apparent = TRUE) %>%
+    mutate(sample = map(splits, ~analysis(.x)))
+}
+
+# Smoothed bootstrap ===========================================================
+resample_smooth <- function(df, B, spec) {
+  bootstraps(df, times = B, apparent = TRUE) %>%
+    mutate(
       sample = map(splits,
-                 ~.x %>%
-                   analysis() %>%
-                   select(all_of(variable))
+                 ~select(analysis(.), spec$var) + matrix(
+                                                    rnorm(
+                                                      nrow(.) * ncol(.),
+                                                      sd = 1 / sqrt(nrow(.))
+                                                    ),
+                                                    ncol = ncol(.)
+                                                  )
                )
     )
-  if (fn %in% c("Median")) {
-    boot_samples = mutate(boot_samples,
-                     sample = map(sample,
-                                ~.x + matrix(
-                                        rnorm(nrow(.x)*ncol(.x)),
-                                        ncol = ncol(.x)
-                                      )
-                              )
-                   )
-  }
-  
-  # Compute statistic on bootstrap samples
-  statistic = select_fn(fn)
-  reps = boot_samples %>%
-    mutate(
-      estimate = map(sample,
-                   function(sample, fn, variable) {
-                     sample %>%
-                       pull(as.name(variable)) %>%
-                       fn()
-                   },
-                   variable = variable,
-                   fn = statistic
-                 )
-    ) %>%
-    unnest(estimate)
-  boot_stat = mean(reps$estimate)
-  
-  return(list(reps = reps, stat = boot_stat))
 }
 
-# Builds a pivot confidence interval at the specified confidence level ---------
-make_pivot_ci = function(df, variable, alpha) {
-  v = df[[variable]]
-  
-  # Compute upper and lower quantiles
-  upper_quantile = quantile(v, probs = 1 - (alpha / 2), na.rm = TRUE)
-  lower_quantile = quantile(v, probs = alpha / 2, na.rm = TRUE)
-  
-  # Compute CI
-  center = mean(v)
-  ci = c(center, (2 * center) - c(upper_quantile, lower_quantile))
-  return(ci)
+# Statistic evaluation methods #################################################
+# Mean =========================================================================
+eval_mean <- function(df, spec) {
+  mutate(df, replication = map_dbl(sample, estimate_mean, spec = spec))
 }
 
-# Helpers ======================================================================
-# Selects function to apply ----------------------------------------------------
-select_fn = function(fn) {
-  switch(fn,
-         "Mean" = mean,
-         "Median" = median
+# Median =======================================================================
+eval_median <- function(df, spec) {
+  mutate(df, replication = map_dbl(sample, estimate_median, spec = spec))
+}
+
+# Correlation ==================================================================
+eval_correlation <- function(df, spec) {
+  mutate(df, replication = map_dbl(sample, estimate_correlation, spec = spec))
+}
+
+# Helper functions #############################################################
+# Generates procedure specification ============================================
+make_spec <- function(stat, var1, vars = NULL) {
+  switch(stat,
+    "Mean" = list(stat = "Mean", var = var1),
+    "Median" = list(stat = "Median", var = var1),
+    "Correlation" = list(stat = "Correlation", var1 = var1, var2 = vars)
   )
 }

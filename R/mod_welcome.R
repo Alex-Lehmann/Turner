@@ -15,7 +15,8 @@ welcome_ui = function(id) {
     # Intro panel ================================================================
       mainPanel(
         titlePanel("Welcome to Turner!"),
-        # Blurb ------------------------------------------------------------------
+        
+        # Blurb ----------------------------------------------------------------
         HTML("<p><b>Important note: Turner is a work-in-progress. Some features
               may be missing or may not work properly. The user interface may be
               ugly. Use at your own risk.</b>"),
@@ -24,7 +25,8 @@ welcome_ui = function(id) {
               the <a href='https://www.tidymodels.org/'>tidymodels</a>
               framework to resample your provided data and employs a number of
               diagnostic methods to ensure your results are robust."),
-        HTML("<a href='https://github.com/Alex-Lehmann/Turner'>View the full source code on GitHub.</a>")
+        HTML("<a href='https://github.com/Alex-Lehmann/Turner'>View the full
+              source code on GitHub.</a>")
       )
     )
   )
