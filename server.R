@@ -100,15 +100,27 @@ shinyServer(function(input, output, session) {
     
     # Bootstrap estimates ------------------------------------------------------
     # Standard error
-    values$se <- values$boots %>%
-      summarize(across(starts_with("replication"), sd)) %>%
-      flatten()
+    values$se <- estimate_distribution(values$boots, sd)
     print(paste0("SE: ", values$se))
+    print(values$se)
     
     # Bias
-    values$bias <- values$boots %>%
-      summarize(across(starts_with("replication"), mean)) %>%
-      map2(., values$estimate, `-`)
+    values$bias <- map2(
+                     estimate_distribution(values$boots, mean),
+                     values$estimate,
+                     `-`
+                   )
     print(paste0("Bias: ", values$bias))
+    print(values$bias)
+    
+    # Skewness
+    values$skewness <- estimate_distribution(values$boots, skewness)
+    print(paste0("Skewness:", values$skewness))
+    print(values$skewness)
+    
+    # Kurtosis
+    values$kurtosis <- estimate_distribution(values$boots, kurtosis)
+    print(paste0("Kurtosis: ", values$kurtosis))
+    print(values$kurtosis)
   })
 })

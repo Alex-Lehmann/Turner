@@ -1,4 +1,4 @@
-# Resampling operation =========================================================
+# Resampling and estimation operations #########################################
 do_bootstrap <- function(df, B, spec, coefs = NULL) {
   # Select bootstrap procedure and generate bootstrap samples
   if (spec$stat %in% "Median") boot_proc <- resample_smooth
@@ -15,6 +15,12 @@ do_bootstrap <- function(df, B, spec, coefs = NULL) {
   boot_reps <- eval_stat(boot_samples, spec)
   
   return(boot_reps)
+}
+
+estimate_distribution <- function(df, fn) {
+  df %>%
+    summarize(across(starts_with("replication"), fn)) %>%
+    flatten()
 }
 
 # Bootstrap procedures #########################################################
