@@ -10,7 +10,7 @@ shinyServer(function(input, output, session) {
   output$data_preview <- renderDataTable({
     # Don't display table until something is loaded
     if (is.null(values$data)) return(NULL)
-    else return(select(values$data, -row_id))
+    else return(dplyr::select(values$data, -row_id))
   }, options = list(scrollX=TRUE))
   
   # Variable selectors ---------------------------------------------------------
@@ -28,7 +28,7 @@ shinyServer(function(input, output, session) {
     # Generate control
     if (input$param_stat %in% "Correlation") {
       control <- fluidRow(column(width = 12, var1_selector, var2_selector))
-    } else if (input$param_stat %in% "Linear Model") {
+    } else if (input$param_stat %in% "Linear Regression") {
       control <- fluidRow(column(width = 12, var1_selector, vars_selector))
     } else control <- var1_selector
     
@@ -75,11 +75,12 @@ shinyServer(function(input, output, session) {
                        input$param_var1,
                        input$param_var2
                      )
-    } else if (input$param_stat %in% "Linear Model") {
+    } else if (input$param_stat %in% "Linear Regression") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
-                       input$param_vars
+                       input$param_vars,
+                       input$param_fit
                      )
     } else values$spec <- make_spec(input$param_stat, input$param_var1)
     
@@ -100,27 +101,23 @@ shinyServer(function(input, output, session) {
     
     # Bootstrap estimates ------------------------------------------------------
     # Standard error
-    values$se <- estimate_distribution(values$boots, sd)
+    values$se <- estimate_summary(values$boots, sd)
     print(paste0("SE: ", values$se))
-    print(values$se)
     
     # Bias
     values$bias <- map2(
-                     estimate_distribution(values$boots, mean),
+                     estimate_summary(values$boots, mean),
                      values$estimate,
                      `-`
                    )
     print(paste0("Bias: ", values$bias))
-    print(values$bias)
     
     # Skewness
-    values$skewness <- estimate_distribution(values$boots, skewness)
+    values$skewness <- estimate_summary(values$boots, skewness)
     print(paste0("Skewness:", values$skewness))
-    print(values$skewness)
     
     # Kurtosis
-    values$kurtosis <- estimate_distribution(values$boots, kurtosis)
+    values$kurtosis <- estimate_summary(values$boots, kurtosis)
     print(paste0("Kurtosis: ", values$kurtosis))
-    print(values$kurtosis)
   })
 })

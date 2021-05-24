@@ -4,7 +4,7 @@ point_estimate <- function(df, spec) {
                    "Mean" = estimate_mean,
                    "Median" = estimate_median,
                    "Correlation" = estimate_correlation,
-                   "Linear Model" = estimate_lm
+                   "Linear Regression" = estimate_lm
                  )
   estimate <- estimate_fn(df, spec)
   return(estimate)
@@ -25,18 +25,22 @@ estimate_correlation <- function(df, spec) {
   return(cor_mat[1,2])
 }
 
-# Linear model =================================================================
+# Linear regressio =============================================================
 estimate_lm <- function(df, spec) {
-  # Construct model formula
+  # Construct model formula and fit
   model <- as.formula(paste0(
                         spec$response,
                         " ~ ",
                         str_c(spec$predictors, collapse = " + ")
                       )
            )
-  fit <- lm(model, data = df)
+  #fit <- lm(model, df)
+  fit <- switch(spec$fit,
+           "Ordinary Least Squares" = lm(model, df),
+           "Least Median of Squares" = lmsreg(model, df)
+         )
   
-  # Convert results to list
+  # Extract coefficients from fit
   coefs <- fit$coefficients %>%
     as.list() %>%
     set_names(

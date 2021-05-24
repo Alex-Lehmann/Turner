@@ -24,7 +24,7 @@ shinyUI(fluidPage(
           h3("Bootstrap Settings"),
           fluidRow(
             # Bootstrap parameters ---------------------------------------------
-            column(width = 6,
+            column(width = 4,
               h4("Bootstrap Parameters"),
               numericInput("param_B",
                 "Bootstrap Samples:",
@@ -40,13 +40,24 @@ shinyUI(fluidPage(
               )
             ),
             
-            # Model-specific controls ------------------------------------------
-            column(width = 6,
+            # Model-selection --------------------------------------------------
+            column(width = 4,
               h4("Model/Statistic Selection"),
               selectInput("param_stat",
                 "Model/Statistic:",
-                c("Mean", "Median", "Correlation", "Linear Model")
+                c("Mean", "Median", "Correlation", "Linear Regression")
               ),
+              conditionalPanel("input.param_stat == 'Linear Regression'",
+                selectInput("param_fit",
+                  "Fit Method:",
+                  c("Ordinary Least Squares", "Least Median of Squares")
+                )
+              )
+            ),
+            
+            # Variable selection -----------------------------------------------
+            column(width = 4,
+              h4("Variable Selection"),
               uiOutput("var_selector")
             )
           ),
