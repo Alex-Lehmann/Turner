@@ -60,7 +60,7 @@ shinyServer(function(input, output, session) {
   
   # Procedure setup page =======================================================
   observeEvent(input$settings_next, {
-    # Validate and store settings ----------------------------------------------
+    # Set up procedure ---------------------------------------------------------
     if (!is.na(input$param_B) & input$param_B > 0) {
       values$param_B <- round(input$param_B)
     } else values$param_B <- 1000
@@ -93,7 +93,8 @@ shinyServer(function(input, output, session) {
     values$boots <- do_bootstrap(
                       df = values$data,
                       B = values$param_B,
-                      spec = values$spec
+                      spec = values$spec,
+                      coefs = values$estimate
                     )
     values$jab_samples <- jackknife_after_bootstrap(values$boots)
     

@@ -1,9 +1,9 @@
 # Resampling operation =========================================================
-do_bootstrap <- function(df, B, spec) {
+do_bootstrap <- function(df, B, spec, coefs = NULL) {
   # Select bootstrap procedure and generate bootstrap samples
   if (spec$stat %in% "Median") boot_proc <- resample_smooth
   else boot_proc <- resample_cases
-  boot_samples <- boot_proc(df, B, spec)
+  boot_samples <- boot_proc(df, B, spec, coefs)
   
   # Select evaluation method and compute bootstrap replications
   eval_stat <- switch(spec$stat,
@@ -19,13 +19,13 @@ do_bootstrap <- function(df, B, spec) {
 
 # Bootstrap procedures #########################################################
 # Case resampling ==============================================================
-resample_cases <- function(df, B, spec) {
+resample_cases <- function(df, B, spec, coefs = NULL) {
   bootstraps(df, times = B, apparent = TRUE) %>%
-    mutate(sample = map(splits, ~analysis(.x)))
+    mutate(sample = map(splits, ~analysis(.)))
 }
 
 # Smoothed bootstrap ===========================================================
-resample_smooth <- function(df, B, spec) {
+resample_smooth <- function(df, B, spec, coefs = NULL) {
   bootstraps(df, times = B, apparent = TRUE) %>%
     mutate(
       sample = map(splits,
@@ -38,6 +38,39 @@ resample_smooth <- function(df, B, spec) {
                                                   )
                )
     )
+}
+
+# Residual resampling for models y = XB + e ====================================
+resample_residuals <- function(df, B, spec, coefs) {
+  # Calculate residuals --------------------------------------------------------
+  # Construct design matrix
+  X_values <- rep(1, nrow(df))
+  for (covariate in spec$predictors) {
+    X_values <- c(X_values, pull(df, as.name(covariate)))
+  }
+  X <- matrix(
+         X_values, nrow = nrow(df),
+         dimnames = list(rownames(df), c("Intercept", spec$predictors)))
+  
+  # Compute predicted responses and compute residuals
+  predictions <- as.vector(X %*% unlist(coefs))
+  residuals <- pull(df, as.name(spec$response)) - predicted_responses
+  
+  # Resample residuals to obtain bootstrap data --------------------------------
+  boot_samples <- bootstraps(tibble(boot_residual = residuals)) %>%
+    mutate(
+      sample = map(splits,
+                 ~analysis(.) %>%
+                   mutate(!!spec$response := boot_residual + predictions) %>%
+                   cbind( # Add covariates
+                     X %>%
+                       as_tibble() %>%
+                       select(-Intercept)
+                   )
+               )
+    )
+  
+  return(boot_samples)
 }
 
 # Statistic evaluation methods #################################################
