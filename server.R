@@ -19,16 +19,20 @@ shinyServer(function(input, output, session) {
     var1_selector <- selectInput("param_var1", "Variable 1:", values$col_names)
     var2_selector <- selectInput("param_var2", "Variable 2:", values$col_names)
     
+    vars_selector <- selectInput("param_vars",
+                       "Predictors:",
+                       values$col_names,
+                       multiple = TRUE
+                     )
+    
     # Generate control
-    if (input$param_stat %in% c("Mean", "Median")) control <- var1_selector
-    else if (input$param_stat %in% "Correlation") {
-      control <- fluidRow(
-                   column(width = 12,
-                     var1_selector,
-                     var2_selector
-                   )
-                 )
-    }
+    if (input$param_stat %in% "Correlation") {
+      control <- fluidRow(column(width = 12, var1_selector, var2_selector))
+    } else if (input$param_stat %in% "Linear Model") {
+      control <- fluidRow(column(width = 12, var1_selector, vars_selector))
+    } else control <- var1_selector
+    
+    return(control)
   })
   
   # UI event handlers ##########################################################
@@ -65,15 +69,19 @@ shinyServer(function(input, output, session) {
     } else values$param_seed <- NA
     
     # Generate procedure specification
-    if (input$param_stat %in% c("Mean", "Median")) {
-      values$spec <- make_spec(input$param_stat, input$param_var1)
-    } else if (input$param_stat %in% "Correlation") {
+    if (input$param_stat %in% "Correlation") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
                        input$param_var2
                      )
-    }
+    } else if (input$param_stat %in% "Linear Model") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_vars
+                     )
+    } else values$spec <- make_spec(input$param_stat, input$param_var1)
     
     # Random seed --------------------------------------------------------------
     if (!is.na(values$param_seed)) set.seed(values$param_seed)
@@ -81,18 +89,25 @@ shinyServer(function(input, output, session) {
     
     # Execute resampling -------------------------------------------------------
     values$estimate <- point_estimate(values$data, values$spec)
+    print(paste0("Estimate: ", values$estimate))
     values$boots <- do_bootstrap(
                       df = values$data,
                       B = values$param_B,
                       spec = values$spec
                     )
     values$jab_samples <- jackknife_after_bootstrap(values$boots)
-    print(values$jab_samples)
     
     # Bootstrap estimates ------------------------------------------------------
-    values$se <- sd(values$boots$replication)
+    # Standard error
+    values$se <- values$boots %>%
+      summarize(across(starts_with("replication"), sd)) %>%
+      flatten()
     print(paste0("SE: ", values$se))
-    values$bias <- mean(values$boots$replication) - values$estimate
+    
+    # Bias
+    values$bias <- values$boots %>%
+      summarize(across(starts_with("replication"), mean)) %>%
+      map2(., values$estimate, `-`)
     print(paste0("Bias: ", values$bias))
   })
 })

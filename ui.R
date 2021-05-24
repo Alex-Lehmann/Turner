@@ -45,7 +45,7 @@ shinyUI(fluidPage(
               h4("Model/Statistic Selection"),
               selectInput("param_stat",
                 "Model/Statistic:",
-                c("Mean", "Median", "Correlation")
+                c("Mean", "Median", "Correlation", "Linear Model")
               ),
               uiOutput("var_selector")
             )
