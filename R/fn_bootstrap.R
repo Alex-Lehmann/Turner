@@ -2,6 +2,7 @@
 do_bootstrap <- function(df, B, spec, coefs = NULL) {
   # Select bootstrap procedure and generate bootstrap samples
   if (spec$stat %in% "Median") boot_proc <- resample_smooth
+  else if (spec$stat %in% "Linear Regression") boot_proc <- resample_residuals
   else boot_proc <- resample_cases
   boot_samples <- boot_proc(df, B, spec, coefs)
   
@@ -58,26 +59,39 @@ resample_residuals <- function(df, B, spec, coefs) {
   }
   X <- matrix(
          X_values, nrow = nrow(df),
-         dimnames = list(rownames(df), c("Intercept", spec$predictors))
+         dimnames = list(df$row_id, c("Intercept", spec$predictors))
        )
   
   # Compute predicted responses and compute residuals
   predictions <- as.vector(X %*% unlist(coefs))
-  residuals <- pull(df, as.name(spec$response)) - predicted_responses
+  residuals <- pull(df, as.name(spec$response)) - predictions
   
-  # Resample residuals to obtain bootstrap data --------------------------------
-  boot_samples <- bootstraps(tibble(boot_residual = residuals)) %>%
-    mutate(
-      sample = map(splits,
-                 ~analysis(.) %>%
-                   mutate(!!spec$response := boot_residual + predictions) %>%
-                   cbind( # Add covariates
-                     X %>%
-                       as_tibble() %>%
-                       select(-Intercept)
-                   )
-               )
+  # Resample residuals ---------------------------------------------------------
+  # Create bootstrap response data
+  boot_samples <- bootstraps(
+                    tibble(
+                      boot_residual = residuals,
+                      row_id = rownames(X)
+                    ),
+                    times = B,
+                    apparent = TRUE
+                  ) %>%
+    mutate(sample = map(splits,
+                      ~analysis(.) %>%
+                         mutate(
+                           !!spec$response := boot_residual + predictions,
+                           row_id = as.integer(row_id)
+                         )
+           )
     )
+  
+  # Add covariates
+  covariates <- dplyr::select(df, row_id, spec$predictors)
+  boot_samples <- mutate(boot_samples,
+                    sample = map(sample,
+                               inner_join, y = covariates, by = "row_id"
+                             )
+                  )
   
   return(boot_samples)
 }
