@@ -7,7 +7,9 @@ point_estimate <- function(df, spec) {
                    "Linear Regression" = estimate_lm
                  )
   estimate <- estimate_fn(df, spec)
-  return(estimate)
+  
+  if (!is.list(estimate)) return(list(replication = estimate))
+  else return(estimate)
 }
 
 # Statistic evaluation methods #################################################
@@ -20,12 +22,12 @@ estimate_median <- function(df, spec) { median(pull(df, as.name(spec$var))) }
 # Correlation ==================================================================
 estimate_correlation <- function(df, spec) {
   cor_mat <- df %>%
-    select(spec$var1, spec$var2) %>%
+    dplyr::select(spec$var1, spec$var2) %>%
     cor()
   return(cor_mat[1,2])
 }
 
-# Linear regressio =============================================================
+# Linear regression ============================================================
 estimate_lm <- function(df, spec) {
   # Construct model formula and fit
   model <- as.formula(paste0(

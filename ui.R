@@ -64,6 +64,11 @@ shinyUI(fluidPage(
           
           # Go button ----------------------------------------------------------
           actionButton("settings_next", "Compute", width = "100%")
+        ),
+        
+        # Results ##############################################################
+        tabPanelBody("results",
+          actionButton("add", "Add")
         )
       )
     )

@@ -21,7 +21,8 @@ do_bootstrap <- function(df, B, spec, coefs = NULL) {
 estimate_summary <- function(df, fn) {
   df %>%
     summarize(across(starts_with("replication"), fn)) %>%
-    flatten()
+    flatten() %>%
+    as.list()
 }
 
 # Bootstrap procedures #########################################################
@@ -36,13 +37,13 @@ resample_smooth <- function(df, B, spec, coefs = NULL) {
   bootstraps(df, times = B, apparent = TRUE) %>%
     mutate(
       sample = map(splits,
-                 ~select(analysis(.), spec$var) + matrix(
-                                                    rnorm(
-                                                      nrow(.) * ncol(.),
-                                                      sd = 1 / sqrt(nrow(.))
-                                                    ),
-                                                    ncol = ncol(.)
-                                                  )
+                 ~dplyr::select(analysis(.), spec$var) + matrix(
+                                                           rnorm(
+                                                             nrow(.) * ncol(.),
+                                                             sd = 1 / sqrt(nrow(.))
+                                                           ),
+                                                           ncol = ncol(.)
+                                                         )
                )
     )
 }
@@ -97,11 +98,19 @@ eval_correlation <- function(df, spec) {
   mutate(df, replication = map_dbl(sample, estimate_correlation, spec = spec))
 }
 
-# Linear model =================================================================
+# Linear regression ============================================================
 eval_lm <- function(df, spec) {
-  df %>%
+  replications <- df %>%
     mutate(replication = map(sample, estimate_lm, spec = spec)) %>%
-    unnest_wider(replication)
+    unnest_wider(replication) %>%
+    dplyr::select(starts_with("replication_"))
+  
+  augmented_df <- df
+  for (col_name in colnames(replications)) {
+    augmented_df <- mutate(augmented_df, !!col_name := replications[[col_name]])
+  }
+  
+  return(augmented_df)
 }
 
 # Helper functions #############################################################

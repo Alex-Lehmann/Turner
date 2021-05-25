@@ -90,7 +90,6 @@ shinyServer(function(input, output, session) {
     
     # Execute resampling -------------------------------------------------------
     values$estimate <- point_estimate(values$data, values$spec)
-    print(paste0("Estimate: ", values$estimate))
     values$boots <- do_bootstrap(
                       df = values$data,
                       B = values$param_B,
@@ -100,24 +99,26 @@ shinyServer(function(input, output, session) {
     values$jab_samples <- jackknife_after_bootstrap(values$boots)
     
     # Bootstrap estimates ------------------------------------------------------
-    # Standard error
     values$se <- estimate_summary(values$boots, sd)
-    print(paste0("SE: ", values$se))
-    
-    # Bias
     values$bias <- map2(
                      estimate_summary(values$boots, mean),
                      values$estimate,
                      `-`
                    )
-    print(paste0("Bias: ", values$bias))
-    
-    # Skewness
     values$skewness <- estimate_summary(values$boots, skewness)
-    print(paste0("Skewness:", values$skewness))
-    
-    # Kurtosis
     values$kurtosis <- estimate_summary(values$boots, kurtosis)
-    print(paste0("Kurtosis: ", values$kurtosis))
+    
+    # Display results ----------------------------------------------------------
+    # Generate results modules for each estimated parameter
+    for (parameter in names(values$estimate)) {
+      id <- str_replace(parameter, "replication_", "")
+      print(id)
+      
+      insertUI(selector = "#add", where = "afterEnd", results_ui(id))
+      results_server(id, values)
+    }
+    
+    # Show results
+    updateTabsetPanel(session, "wizard", "results")
   })
 })
