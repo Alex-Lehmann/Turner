@@ -39,7 +39,8 @@ estimate_lm <- function(df, spec) {
   #fit <- lm(model, df)
   fit <- switch(spec$fit,
            "Ordinary Least Squares" = lm(model, df),
-           "Least Median of Squares" = lmsreg(model, df)
+           "Least Median of Squares" = lmsreg(model, df),
+           "Iteratively Re-Weighted Least Squares" = rlm(model, df)
          )
   
   # Extract coefficients from fit

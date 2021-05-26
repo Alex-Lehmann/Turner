@@ -112,9 +112,7 @@ shinyServer(function(input, output, session) {
     # Generate results modules for each estimated parameter
     for (parameter in names(values$estimate)) {
       id <- str_replace(parameter, "replication_", "")
-      print(id)
-      
-      insertUI(selector = "#add", where = "afterEnd", results_ui(id))
+      insertUI("#results_next", where = "beforeBegin", results_ui(id))
       results_server(id, values)
     }
     

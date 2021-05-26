@@ -3,15 +3,18 @@ results_ui <- function(id) {
   ns = NS(id)
   
   tagList(
-    plotlyOutput(ns("histogram")),
-    sliderInput(ns("alpha"),
-      "Confidence Level:",
-      min = 0.01, max = 0.15,
-      value = 0.05,
-      ticks = FALSE,
-      width = "100%"
-    ),
-    uiOutput(ns("estimates"))
+    wellPanel(
+      fluidRow(column(width = 12, align = "center", uiOutput(ns("title")))),
+      plotlyOutput(ns("histogram")),
+      sliderInput(ns("alpha"),
+        "Confidence Level:",
+        min = 0.01, max = 0.15,
+        value = 0.05,
+        ticks = FALSE,
+        width = "100%"
+      ),
+      uiOutput(ns("estimates"))
+    )
   )
 }
 
@@ -19,6 +22,24 @@ results_ui <- function(id) {
 results_server <- function(id, values) {
   moduleServer(id, function(input, output, session) {
     ns_values <- reactiveValues()
+    
+    # Title ====================================================================
+    output$title <- renderUI({
+      if (values$spec$stat %in% c("Mean", "Median")) {
+        title <- paste0(values$spec$stat, " of ", values$spec$var)
+      } else if (values$spec$stat %in% "Correlation") {
+        title <- paste0(
+                   values$spec$stat,
+                   " Between ",
+                   values$spec$var1, " and ", values$spec$var2
+                 )
+      } else if (values$spec$stat %in% "Linear Regression") {
+        if (id == "Intercept") title <- "Intercept Term"
+        else title <- paste0("Regression Coefficient for ", id)
+      } else "oops"
+      
+      return(titlePanel(title))
+    })
     
     # Histogram ================================================================
     # Histogram definition
@@ -73,7 +94,7 @@ results_server <- function(id, values) {
         
         # Layout
         layout(
-          title = "Bootstrap Estimates with Percentile Confidence Interval",
+          title = "Distribution of Bootstrap Estimates with Confidence Interval",
           xaxis = list(title = "Bootstrap Estimate", fixedrange = TRUE),
           yaxis = list(title = "Count", fixedrange = TRUE),
           yaxis2 = list(
@@ -102,6 +123,9 @@ results_server <- function(id, values) {
     
     # Numerical results ========================================================
     output$estimates <- renderUI({
+      # Preliminaries ----------------------------------------------------------
+      
+      # Get list names for statistic
       if (length(values$estimate) > 1) target_name <- paste0("replication_", id)
       else target_name <- "replication"
       
@@ -127,23 +151,25 @@ results_server <- function(id, values) {
         
         # Summary statistics ---------------------------------------------------
         column(width = 8, align = "center",
-          h2("Distribution Summary Statistics"),
-          hr(),
-          
-          fluidRow(
-            column(width = 6, align = "center",
-              h3("Standard Error"),
-              h4(values$se[[target_name]]),
-              
-              h3("Bias"),
-              h4(values$bias[[target_name]])
-            ),
-            column(width = 6, align = "center",
-              h3("Skewness"),
-              h4(values$skewness[[target_name]]),
-              
-              h3("Kurtosis"),
-              h4(values$kurtosis[[target_name]])
+          wellPanel(
+            h2("Distribution Summary Statistics"),
+            hr(),
+            
+            fluidRow(
+              column(width = 6, align = "center",
+                h3("Standard Error"),
+                h4(values$se[[target_name]]),
+                
+                h3("Bias"),
+                h4(values$bias[[target_name]])
+              ),
+              column(width = 6, align = "center",
+                h3("Skewness"),
+                h4(values$skewness[[target_name]]),
+                
+                h3("Kurtosis"),
+                h4(values$kurtosis[[target_name]])
+              )
             )
           )
         )

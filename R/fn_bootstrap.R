@@ -96,6 +96,28 @@ resample_residuals <- function(df, B, spec, coefs) {
   return(boot_samples)
 }
 
+# Procedure decision functions #################################################
+choose_lm_proc <- function(df, spec) {
+  # Regenerate model -----------------------------------------------------------
+  # Construct model formula and fit
+  model <- as.formula(paste0(
+                        spec$response,
+                        " ~ ",
+                        str_c(spec$predictors, collapse = " + ")
+                      )
+  )
+  fit <- switch(spec$fit,
+                "Ordinary Least Squares" = lm(model, df),
+                "Least Median of Squares" = lmsreg(model, df),
+                "Iteratively Re-Weighted Least Squares" = rlm(model, df)
+  )
+  
+  # White's test for heteroskedasticity ----------------------------------------
+  test <- white_lm(fit)
+  if (test$p.value > 0.05) return(resample_residuals) # Homoskedastic residuals
+  else return(resample_cases) # Heteroskedastic residuals
+}
+
 # Statistic evaluation methods #################################################
 # Mean =========================================================================
 eval_mean <- function(df, spec) {

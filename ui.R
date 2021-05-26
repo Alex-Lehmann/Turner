@@ -50,7 +50,11 @@ shinyUI(fluidPage(
               conditionalPanel("input.param_stat == 'Linear Regression'",
                 selectInput("param_fit",
                   "Fit Method:",
-                  c("Ordinary Least Squares", "Least Median of Squares")
+                  c(
+                    "Ordinary Least Squares",
+                    "Least Median of Squares",
+                    "Huber"
+                  )
                 )
               )
             ),
@@ -68,7 +72,8 @@ shinyUI(fluidPage(
         
         # Results ##############################################################
         tabPanelBody("results",
-          actionButton("add", "Add")
+          titlePanel("Results"),
+          actionButton("results_next", "Next", width = "100%")
         )
       )
     )
