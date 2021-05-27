@@ -59,7 +59,7 @@ estimate_lm <- function(df, spec) {
 # Smoothing splines ============================================================
 estimate_spline <- function(df, spec) {
   model <- list(x = df[[spec$predictor]], y = df[[spec$response]])
-  fit <- smooth.spline(model)
+  fit <- smooth.spline(model, all.knots = TRUE)
   
   return(fit$lambda)
 }
