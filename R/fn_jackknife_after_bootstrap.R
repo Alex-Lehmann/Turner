@@ -18,8 +18,8 @@ jackknife_after_bootstrap <- function(boots) {
   return(tibble(deleted_case = sample_ids, jab_sample = jab_sample))
 }
 
-# Helpers ======================================================================
-# Extract row IDs from rsplit object -------------------------------------------
+# Helpers ######################################################################
+# Extract row IDs from rsplit object ===========================================
 extract_row_ids <- function(split, mode = "analysis") {
   # Set to extract row IDs from
   set_fn <- switch(mode,
@@ -36,7 +36,7 @@ extract_row_ids <- function(split, mode = "analysis") {
   return(row_ids)
 }
 
-# Get all IDs in original sample -----------------------------------------------
+# Get all IDs in original sample ===============================================
 get_sample_ids <- function(boots) {
   sample_ids <- boots %>%
     filter(id == "Apparent") %>%

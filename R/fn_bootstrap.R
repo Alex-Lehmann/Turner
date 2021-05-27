@@ -1,8 +1,8 @@
 # Bootstrapping manager ========================================================
 do_bootstrap <- function(df, B, spec, coefs = NULL) {
   # Select bootstrap procedure and generate bootstrap samples
-  if (spec$stat %in% "Median") boot_proc <- resample_smooth
-  else if (spec$stat %in% "Linear Regression") boot_proc <- resample_residuals
+  if (spec$stat == "Median") boot_proc <- resample_smooth
+  else if (spec$stat == "Linear Regression") boot_proc <- choose_lm_proc(df, spec)
   else boot_proc <- resample_cases
   boot_samples <- boot_proc(df, B, spec, coefs)
   
@@ -11,7 +11,8 @@ do_bootstrap <- function(df, B, spec, coefs = NULL) {
                  "Mean" = eval_mean,
                  "Median" = eval_median,
                  "Correlation" = eval_correlation,
-                 "Linear Regression" = eval_lm
+                 "Linear Regression" = eval_lm,
+                 "Smoothing Spline" = eval_spline
   )
   boot_reps <- eval_stat(boot_samples, spec)
   
@@ -149,6 +150,11 @@ eval_lm <- function(df, spec) {
   return(augmented_df)
 }
 
+# Smoothing splines ============================================================
+eval_spline <- function(df, spec) {
+  mutate(df, replication = map_dbl(sample, estimate_spline, spec = spec))
+}
+
 # Helper functions #############################################################
 # Generates procedure specification ============================================
 make_spec <- function(stat, var1, vars = NULL, fit = NULL) {
@@ -157,10 +163,15 @@ make_spec <- function(stat, var1, vars = NULL, fit = NULL) {
     "Median" = list(stat = stat, var = var1),
     "Correlation" = list(stat = stat, var1 = var1, var2 = vars),
     "Linear Regression" = list(
-                       stat = stat,
-                       response = var1,
-                       predictors = vars,
-                       fit = fit
-                     )
+                            stat = stat,
+                            response = var1,
+                            predictors = vars,
+                            fit = fit
+                          ),
+    "Smoothing Spline" = list(
+                           stat = stat,
+                           response = var1,
+                           predictor = vars
+                         )
   )
 }

@@ -16,21 +16,24 @@ shinyServer(function(input, output, session) {
   # Variable selectors ---------------------------------------------------------
   output$var_selector <- renderUI({
     # Define selectors
-    var1_selector <- selectInput("param_var1", "Variable 1:", values$col_names)
-    var2_selector <- selectInput("param_var2", "Variable 2:", values$col_names)
+    var1_selector <- selectInput("param_var1", "var1_selector", values$col_names)
+    var2_selector <- selectInput("param_var2", "var2_selector", values$col_names)
     
     vars_selector <- selectInput("param_vars",
-                       "Predictors:",
+                       "vars_selector",
                        values$col_names,
                        multiple = TRUE
                      )
     
     # Generate control
-    if (input$param_stat %in% "Correlation") {
+    if (input$param_stat == "Correlation") {
       control <- fluidRow(column(width = 12, var1_selector, var2_selector))
-    } else if (input$param_stat %in% "Linear Regression") {
+    } else if (input$param_stat == "Linear Regression") {
       control <- fluidRow(column(width = 12, var1_selector, vars_selector))
-    } else control <- var1_selector
+    } else if (input$param_stat == "Smoothing Spline") {
+      control <- fluidRow(column(width = 12, var1_selector, var2_selector))
+    }
+    else control <- var1_selector
     
     return(control)
   })
@@ -69,18 +72,24 @@ shinyServer(function(input, output, session) {
     } else values$param_seed <- NA
     
     # Generate procedure specification
-    if (input$param_stat %in% "Correlation") {
+    if (input$param_stat == "Correlation") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
                        input$param_var2
                      )
-    } else if (input$param_stat %in% "Linear Regression") {
+    } else if (input$param_stat == "Linear Regression") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
                        input$param_vars,
                        input$param_fit
+                     )
+    } else if (input$param_stat == "Smoothing Spline") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_var2
                      )
     } else values$spec <- make_spec(input$param_stat, input$param_var1)
     

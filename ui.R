@@ -45,7 +45,10 @@ shinyUI(fluidPage(
               h4("Model/Statistic Selection"),
               selectInput("param_stat",
                 "Model/Statistic:",
-                c("Mean", "Median", "Correlation", "Linear Regression")
+                c(
+                  "Mean", "Median", "Correlation", # Summary statistics
+                  "Linear Regression", "Smoothing Spline" # Regressions
+                )
               ),
               conditionalPanel("input.param_stat == 'Linear Regression'",
                 selectInput("param_fit",

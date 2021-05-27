@@ -27,15 +27,17 @@ results_server <- function(id, values) {
     output$title <- renderUI({
       if (values$spec$stat %in% c("Mean", "Median")) {
         title <- paste0(values$spec$stat, " of ", values$spec$var)
-      } else if (values$spec$stat %in% "Correlation") {
+      } else if (values$spec$stat == "Correlation") {
         title <- paste0(
                    values$spec$stat,
                    " Between ",
                    values$spec$var1, " and ", values$spec$var2
                  )
-      } else if (values$spec$stat %in% "Linear Regression") {
+      } else if (values$spec$stat == "Linear Regression") {
         if (id == "Intercept") title <- "Intercept Term"
         else title <- paste0("Regression Coefficient for ", id)
+      } else if (values$spec$stat == "Smoothing Spline") {
+        title <- "Smoothing Parameter"
       } else "oops"
       
       return(titlePanel(title))

@@ -4,7 +4,8 @@ point_estimate <- function(df, spec) {
                    "Mean" = estimate_mean,
                    "Median" = estimate_median,
                    "Correlation" = estimate_correlation,
-                   "Linear Regression" = estimate_lm
+                   "Linear Regression" = estimate_lm,
+                   "Smoothing Spline" = estimate_spline
                  )
   estimate <- estimate_fn(df, spec)
   
@@ -53,4 +54,12 @@ estimate_lm <- function(df, spec) {
     )
   
   return(coefs)
+}
+
+# Smoothing splines ============================================================
+estimate_spline <- function(df, spec) {
+  model <- list(x = df[[spec$predictor]], y = df[[spec$response]])
+  fit <- smooth.spline(model)
+  
+  return(fit$lambda)
 }
