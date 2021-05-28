@@ -43,7 +43,7 @@ results_server <- function(id, values) {
         title <- "Smoothing Parameter"
         
       } else if (values$spec$stat == "LOESS") {
-        if (length(length(values$spec$target == 1))) {
+        if (length(values$spec$target) == 1) {
           title <- paste0(
                      "LOESS Estimate for ", values$spec$response,
                      " at ", values$spec$target

@@ -57,8 +57,7 @@ shinyUI(fluidPage(
                   "Fit Method:",
                   c(
                     "Ordinary Least Squares",
-                    "Least Median of Squares",
-                    "Huber"
+                    "Iteratively Re-Weighted Least Squares"
                   )
                 )
               ),
