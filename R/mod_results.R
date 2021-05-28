@@ -27,17 +27,34 @@ results_server <- function(id, values) {
     output$title <- renderUI({
       if (values$spec$stat %in% c("Mean", "Median")) {
         title <- paste0(values$spec$stat, " of ", values$spec$var)
+        
       } else if (values$spec$stat == "Correlation") {
         title <- paste0(
                    values$spec$stat,
                    " Between ",
                    values$spec$var1, " and ", values$spec$var2
                  )
+        
       } else if (values$spec$stat == "Linear Regression") {
         if (id == "Intercept") title <- "Intercept Term"
         else title <- paste0("Regression Coefficient for ", id)
+        
       } else if (values$spec$stat == "Smoothing Spline") {
         title <- "Smoothing Parameter"
+        
+      } else if (values$spec$stat == "LOESS") {
+        if (length(length(values$spec$target == 1))) {
+          title <- paste0(
+                     "LOESS Estimate for ", values$spec$response,
+                     " at ", values$spec$target
+                   )
+        } else {
+          title <- paste0(
+                     "LOESS Estimate for ", values$spec$response,
+                     " at (", str_c(values$spec$target, collapse = ", "), ")"
+          )
+        }
+        
       } else "oops"
       
       return(titlePanel(title))

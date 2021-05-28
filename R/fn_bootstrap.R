@@ -12,7 +12,8 @@ do_bootstrap <- function(df, B, spec, coefs = NULL) {
                  "Median" = eval_median,
                  "Correlation" = eval_correlation,
                  "Linear Regression" = eval_lm,
-                 "Smoothing Spline" = eval_spline
+                 "Smoothing Spline" = eval_spline,
+                 "LOESS" = eval_loess
   )
   boot_reps <- eval_stat(boot_samples, spec)
   
@@ -98,6 +99,7 @@ resample_residuals <- function(df, B, spec, coefs) {
 }
 
 # Procedure decision functions #################################################
+# Linear regression ============================================================
 choose_lm_proc <- function(df, spec) {
   # Regenerate model -----------------------------------------------------------
   # Construct model formula and fit
@@ -155,9 +157,14 @@ eval_spline <- function(df, spec) {
   mutate(df, replication = map_dbl(sample, estimate_spline, spec = spec))
 }
 
+# LOESS ========================================================================
+eval_loess <- function(df, spec) {
+  mutate(df, replication = map_dbl(sample, estimate_loess, spec = spec))
+}
+
 # Helper functions #############################################################
 # Generates procedure specification ============================================
-make_spec <- function(stat, var1, vars = NULL, fit = NULL) {
+make_spec <- function(stat, var1, vars = NULL, fit = NULL, target = NULL) {
   switch(stat,
     "Mean" = list(stat = stat, var = var1),
     "Median" = list(stat = stat, var = var1),
@@ -172,6 +179,12 @@ make_spec <- function(stat, var1, vars = NULL, fit = NULL) {
                            stat = stat,
                            response = var1,
                            predictor = vars
-                         )
+                         ),
+    "LOESS" = list(
+                stat = stat,
+                response = var1,
+                predictors = vars,
+                target = target[which(!is.na(target))]
+              )
   )
 }

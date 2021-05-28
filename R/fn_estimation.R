@@ -5,7 +5,8 @@ point_estimate <- function(df, spec) {
                    "Median" = estimate_median,
                    "Correlation" = estimate_correlation,
                    "Linear Regression" = estimate_lm,
-                   "Smoothing Spline" = estimate_spline
+                   "Smoothing Spline" = estimate_spline,
+                   "LOESS" = estimate_loess
                  )
   estimate <- estimate_fn(df, spec)
   
@@ -37,7 +38,7 @@ estimate_lm <- function(df, spec) {
                         str_c(spec$predictors, collapse = " + ")
                       )
            )
-  #fit <- lm(model, df)
+  
   fit <- switch(spec$fit,
            "Ordinary Least Squares" = lm(model, df),
            "Least Median of Squares" = lmsreg(model, df),
@@ -62,4 +63,17 @@ estimate_spline <- function(df, spec) {
   fit <- smooth.spline(model, all.knots = TRUE)
   
   return(fit$lambda)
+}
+
+# LOESS ========================================================================
+estimate_loess <- function(df, spec) {
+  model <- as.formula(paste0(
+                        spec$response,
+                        " ~ ",
+                        str_c(spec$predictors, collapse = " + ")
+                      )
+           )
+  fit <- loess(model, df)
+  
+  return(predict(fit, matrix(spec$target, nrow = 1)))
 }

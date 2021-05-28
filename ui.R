@@ -40,16 +40,18 @@ shinyUI(fluidPage(
               )
             ),
             
-            # Model-selection --------------------------------------------------
+            # Model selection --------------------------------------------------
             column(width = 4,
               h4("Model/Statistic Selection"),
               selectInput("param_stat",
                 "Model/Statistic:",
                 c(
                   "Mean", "Median", "Correlation", # Summary statistics
-                  "Linear Regression", "Smoothing Spline" # Regressions
+                  "Linear Regression", "Smoothing Spline", "LOESS" # Regressions
                 )
               ),
+              
+              # Linear regression-specific
               conditionalPanel("input.param_stat == 'Linear Regression'",
                 selectInput("param_fit",
                   "Fit Method:",
@@ -58,6 +60,17 @@ shinyUI(fluidPage(
                     "Least Median of Squares",
                     "Huber"
                   )
+                )
+              ),
+              
+              # LOESS-specific
+              conditionalPanel("input.param_stat == 'LOESS'",
+                numericInput("param_target1", "target1_value", NULL),
+                conditionalPanel("input.param_vars.length > 1",
+                  numericInput("param_target2", "target2_value", NULL)
+                ),
+                conditionalPanel("input.param_vars.length > 2",
+                  numericInput("param_target3", "target3_value", NULL)
                 )
               )
             ),

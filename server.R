@@ -26,14 +26,11 @@ shinyServer(function(input, output, session) {
                      )
     
     # Generate control
-    if (input$param_stat == "Correlation") {
+    if (input$param_stat %in% c("Correlation", "Smoothing Spline")) {
       control <- fluidRow(column(width = 12, var1_selector, var2_selector))
-    } else if (input$param_stat == "Linear Regression") {
+    } else if (input$param_stat %in% c("Linear Regression", "LOESS")) {
       control <- fluidRow(column(width = 12, var1_selector, vars_selector))
-    } else if (input$param_stat == "Smoothing Spline") {
-      control <- fluidRow(column(width = 12, var1_selector, var2_selector))
-    }
-    else control <- var1_selector
+    } else control <- var1_selector
     
     return(control)
   })
@@ -83,7 +80,7 @@ shinyServer(function(input, output, session) {
                        input$param_stat,
                        input$param_var1,
                        input$param_vars,
-                       input$param_fit
+                       fit = input$param_fit
                      )
     } else if (input$param_stat == "Smoothing Spline") {
       values$spec <- make_spec(
@@ -91,7 +88,19 @@ shinyServer(function(input, output, session) {
                        input$param_var1,
                        input$param_var2
                      )
-    } else values$spec <- make_spec(input$param_stat, input$param_var1)
+    } else if (input$param_stat == "LOESS") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_vars,
+                       target = c(
+                                  input$param_target1,
+                                  input$param_target2,
+                                  input$param_target3
+                                )
+                     )
+    }
+    else values$spec <- make_spec(input$param_stat, input$param_var1)
     
     # Random seed --------------------------------------------------------------
     if (!is.na(values$param_seed)) set.seed(values$param_seed)
