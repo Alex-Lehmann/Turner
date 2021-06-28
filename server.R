@@ -6,6 +6,21 @@ shinyServer(function(input, output, session) {
   
   # UI element definitions #####################################################
   # Procedure setup ============================================================
+  # Data selector/upload -------------------------------------------------------
+  output$data_selector <- renderUI({
+    fluidRow(
+      column(width = 12,
+        selectInput("data_select",
+          "Data:",
+          c("User Upload", "mtcars", "iris", "galaxies")
+        ),
+        conditionalPanel("input.data_select == 'User Upload'",
+          fileInput("user_file", "Upload CSV data", accept = ".csv")
+        )
+      )
+    )
+  })
+  
   # Data preview ---------------------------------------------------------------
   output$data_preview <- renderDataTable({
     # Don't display table until something is loaded
@@ -45,7 +60,18 @@ shinyServer(function(input, output, session) {
       message(paste0("File ", path, " is not a .csv file."))
     } else {
       # Add row IDs and store
-      df <- read_csv(path, col_types=cols())
+      df <- read_csv(path, col_types = cols())
+      values$data <- mutate(df, row_id = 1:nrow(df))
+      values$col_names <- colnames(df)
+      values$upload_flag <- TRUE
+    }
+  })
+  
+  # Toy data input -------------------------------------------------------------
+  observeEvent(input$data_select, {
+    if (input$data_select != "User Upload") {
+      path <- paste0("toy_data/", input$data_select, ".csv")
+      df <- read_csv(path, col_types = cols())
       values$data <- mutate(df, row_id = 1:nrow(df))
       values$col_names <- colnames(df)
       values$upload_flag <- TRUE

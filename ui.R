@@ -16,7 +16,7 @@ shinyUI(fluidPage(
           
           # Data upload ========================================================
           h3("Data"),
-          fileInput("user_file", "Upload CSV data", accept = ".csv"),
+          uiOutput("data_selector"),
           dataTableOutput("data_preview"),
           hr(),
           
