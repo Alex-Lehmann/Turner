@@ -73,26 +73,30 @@ shinyServer(function(input, output, session) {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
-                       input$param_var2
+                       input$param_var2,
+                       input$param_threshold
                      )
     } else if (input$param_stat == "Linear Regression") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
                        input$param_vars,
+                       input$param_threshold,
                        fit = input$param_fit
                      )
     } else if (input$param_stat == "Smoothing Spline") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
-                       input$param_var2
+                       input$param_var2,
+                       input$param_threshold
                      )
     } else if (input$param_stat == "LOESS") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
                        input$param_vars,
+                       input$param_threshold,
                        target = c(
                                   input$param_target1,
                                   input$param_target2,
@@ -100,7 +104,11 @@ shinyServer(function(input, output, session) {
                                 )
                      )
     }
-    else values$spec <- make_spec(input$param_stat, input$param_var1)
+    else values$spec <- make_spec(
+                          input$param_stat,
+                          input$param_var1,
+                          threshold = input$param_threshold
+                        )
     
     # Random seed --------------------------------------------------------------
     if (!is.na(values$param_seed)) set.seed(values$param_seed)
@@ -114,7 +122,17 @@ shinyServer(function(input, output, session) {
                       spec = values$spec,
                       coefs = values$estimate
                     )
-    values$jab_samples <- jackknife_after_bootstrap(values$boots)
+    
+    # Run diagnostics ----------------------------------------------------------
+    values$jab_samples <- values$boots %>%
+      jackknife_after_bootstrap() %>%
+      jackknife_influence() %>%
+      find_quantiles()
+    values$uncertainty <- get_uncertainty_bands(
+      values$boots,
+      values$jab_samples
+    )
+    values$jab_samples <- check_outliers(values$jab_samples, values$uncertainty)
     
     # Bootstrap estimates ------------------------------------------------------
     values$se <- estimate_summary(values$boots, sd)

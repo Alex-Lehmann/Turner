@@ -37,6 +37,12 @@ shinyUI(fluidPage(
                 min = 1,
                 value = NULL,
                 step = 1
+              ),
+              sliderInput("param_threshold",
+                "Outlier Threshold:",
+                min = 0, max = 1,
+                value = 0.9,
+                ticks = FALSE
               )
             ),
             
