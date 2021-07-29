@@ -50,6 +50,110 @@ shinyServer(function(input, output, session) {
     return(control)
   })
   
+  output$strata_selector <- renderUI({
+    selectInput("param_strata", "Strata", c(" ", values$col_names))
+  })
+  
+  # Jackknife-after-bootstrap ==================================================
+  # Plot -----------------------------------------------------------------------
+  output$jab_plot <- renderPlotly({
+    # Calculate disruption for given quantile
+    values$jab_samples <- bootstrap_disruption(
+                            input$jab_quantile,
+                            values$boots,
+                            values$jab_samples
+                          )
+    
+    # Calculate uncertainty for given quantile and detect outliers
+    values$uncertainty <- get_uncertainty_bound(
+                            input$outlier_threshold,
+                            values$boots,
+                            values$jab_samples
+                          )
+    values$jab_samples <- mutate(values$jab_samples,
+                            outlier = disruption > values$uncertainty
+                          )
+    
+    # Base Plotly object
+    fig <- plot_ly(type = "scatter", showlegend = FALSE) %>%
+      layout(
+        title = "Jackknife-After-Bootstrap Plot",
+        xaxis = list(title = "Relative Influence", zeroline = FALSE),
+        yaxis = list(title = "Disruption")
+      ) %>%
+      config(displayModeBar = FALSE)
+    
+    # Sorted tibble to trace
+    jab_data <- values$jab_samples %>%
+      dplyr::select(deleted_case, rel_influence, disruption, outlier) %>%
+      arrange(rel_influence) %>%
+      set_colnames(c("deleted_case", "x", "y", "outlier"))
+    
+    # Uncertainty bound tibble
+    uncertainty_data <- tibble(
+                          x = c(0, max(jab_data$x)) * 1.05,
+                          y = values$uncertainty
+                        )
+    
+    # Add traces
+    fig <- fig %>%
+      # Uncertainty bound
+      add_trace(
+        data = uncertainty_data,
+        x = ~x, y = ~y,
+        name = "Uncertainty Bound",
+        mode = "lines", line = list(color = "#000000", dash = "dash"),
+        fill = "tozeroy", fillcolor = "rgba(0, 0, 0, 0.2)",
+        hoverinfo = "skip"
+      ) %>%
+      
+      # Jackknife quantiles
+      add_trace(
+        data = jab_data,
+        x = ~x, y = ~y,
+        mode = "markers", marker = list(size = 10),
+        symbol = ~outlier, symbols = c("o", "x-thin"),
+        color = "orange",
+        customdata = ~deleted_case,
+        hovertemplate = "ID: %{customdata}<br>Influence: %{x}<br>Disruption: %{y}"
+      ) %>%
+      add_trace(
+        data = jab_data,
+        x = ~x, y = ~y,
+        mode = "lines",
+        color = "orange",
+        hoverinfo = "skip"
+      )
+    
+    fig
+  })
+  
+  # Outlier list ---------------------------------------------------------------
+  output$outlier_list <- renderDataTable({
+    outliers <- filter(values$jab_samples, outlier)
+    
+    jab_data <- outliers %>%
+      dplyr::select(
+        `Case No.` = deleted_case,
+        `Relative Influence` = rel_influence,
+        Disruption = disruption
+      )
+    replication_data <- outliers %>%
+      dplyr::select(starts_with("replication")) %>%
+      set_colnames(
+        str_to_title(str_replace_all(colnames(.), "replication_", ""))
+      )
+    
+    cbind(replication_data, jab_data) %>%
+      relocate(`Case No.`) %>%
+      return()
+  })
+  
+  # Outlier boundary -----------------------------------------------------------
+  output$boundary_display <- renderUI({
+    HTML(paste0("<b>Outlier Boundary: ", values$uncertainty, "</b>"))
+  })
+  
   # UI event handlers ##########################################################
   # Procedure setup page =======================================================
   # File upload checking -------------------------------------------------------
@@ -93,21 +197,21 @@ shinyServer(function(input, output, session) {
     if (!is.na(input$param_seed) & input$param_seed > 0) {
       values$param_seed <- round(input$param_seed)
     } else values$param_seed <- NA
+    if (input$param_strata == " ") values$strata <- NULL
+    else values$strata <- input$param_strata
     
     # Generate procedure specification
     if (input$param_stat == "Correlation") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
-                       input$param_var2,
-                       input$param_threshold
+                       input$param_var2
                      )
     } else if (input$param_stat == "Linear Regression") {
       values$spec <- make_spec(
                        input$param_stat,
                        input$param_var1,
                        input$param_vars,
-                       input$param_threshold,
                        fit = input$param_fit
                      )
     } else if (input$param_stat == "Smoothing Spline") {
@@ -122,7 +226,6 @@ shinyServer(function(input, output, session) {
                        input$param_stat,
                        input$param_var1,
                        input$param_vars,
-                       input$param_threshold,
                        target = c(
                                   input$param_target1,
                                   input$param_target2,
@@ -132,8 +235,7 @@ shinyServer(function(input, output, session) {
     }
     else values$spec <- make_spec(
                           input$param_stat,
-                          input$param_var1,
-                          threshold = input$param_threshold
+                          input$param_var1
                         )
     
     # Random seed --------------------------------------------------------------
@@ -146,19 +248,14 @@ shinyServer(function(input, output, session) {
                       df = values$data,
                       B = values$param_B,
                       spec = values$spec,
-                      coefs = values$estimate
+                      coefs = values$estimate,
+                      strata = values$strata
                     )
     
     # Run diagnostics ----------------------------------------------------------
     values$jab_samples <- values$boots %>%
       jackknife_after_bootstrap() %>%
-      jackknife_influence() %>%
-      find_quantiles()
-    values$uncertainty <- get_uncertainty_bands(
-      values$boots,
-      values$jab_samples
-    )
-    values$jab_samples <- check_outliers(values$jab_samples, values$uncertainty)
+      jackknife_influence()
     
     # Bootstrap estimates ------------------------------------------------------
     values$se <- estimate_summary(values$boots, sd)
@@ -180,5 +277,10 @@ shinyServer(function(input, output, session) {
     
     # Show results
     updateTabsetPanel(session, "wizard", "results")
+  })
+  
+  # Results page ===============================================================
+  observeEvent(input$results_next, {
+    updateTabsetPanel(session, "wizard", "outliers")
   })
 })

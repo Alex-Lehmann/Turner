@@ -2,36 +2,31 @@
 make_spec <- function(stat,
                       var1,
                       vars = NULL,
-                      threshold,
                       fit = NULL,
                       target = NULL) {
   spec <- switch(stat,
-            "Mean" = list(stat = stat, var = var1, threshold = threshold),
-            "Median" = list(stat = stat, var = var1, threshold = threshold),
+            "Mean" = list(stat = stat, var = var1),
+            "Median" = list(stat = stat, var = var1),
             "Correlation" = list(
                               stat = stat,
                               var1 = var1,
-                              var2 = vars,
-                              threshold = threshold
+                              var2 = vars
                             ),
             "Linear Regression" = list(
                                     stat = stat,
                                     response = var1,
                                     predictors = vars,
-                                    threshold = threshold,
                                     fit = fit
                                   ),
             "Smoothing Spline" = list(
                                    stat = stat,
                                    response = var1,
-                                   predictor = vars,
-                                   threshold = threshold
+                                   predictor = vars
                                  ),
             "LOESS" = list(
                         stat = stat,
                         response = var1,
                         predictors = vars,
-                        threshold = threshold,
                         target = target[which(!is.na(target))]
                       )
           )

@@ -23,83 +23,61 @@ jackknife_influence <- function(df) {
   n <- nrow(df)
   
   # Compute jackknife estimates ------------------------------------------------
-  df %>%
+  jab_values <- df %>%
     mutate(
       jab_estimate = map(jab_sample,
                        ~summarize(., across(starts_with("replication"), mean))
                      )
     ) %>%
-    unnest_wider(jab_estimate) %>%
+    unnest_wider(jab_estimate)
     
-    # Compute influence values -------------------------------------------------
+  # Compute influence values -------------------------------------------------
+  jab_influence <- jab_values %>%
     mutate(
-      across(starts_with("replication"), ~(. - mean(.))^2),
-      abs_influence = (n - 1)*sqrt(rowSums(across(starts_with("replication")))),
+      across(starts_with("replication"), ~(mean(.) - .)^2),
+      abs_influence = (n - 1) * sqrt(rowSums(across(starts_with("replication")))),
       rel_influence = abs_influence / sqrt(sum(abs_influence^2) / (n - 1))
     ) %>%
-    return()
+    dplyr::select(abs_influence, rel_influence)
+  
+  return(cbind(jab_values, jab_influence))
 }
 
 # Finds quantiles for case-deletion estimates ==================================
-find_quantiles <- function(df) {
-  mutate(df,
-    # Compute L2 distance for bootstrap estimates ------------------------------
-    jab_sample = map(jab_sample, l2),
-    
-    # Find 5%, 50%, and 95% L2 error quantiles ---------------------------------
-    quantile_0.05 = map_dbl(jab_sample, ~quantile(.$l2_value, 0.05)),
-    quantile_0.50 = map_dbl(jab_sample, ~quantile(.$l2_value, 0.5)),
-    quantile_0.95 = map_dbl(jab_sample, ~quantile(.$l2_value, 0.95))
-  )
+bootstrap_disruption <- function(q, boots, jab_samples) {
+  # Full-data quantiles --------------------------------------------------------
+  bootstrap_quantiles <- boots %>%
+    summarize(across(starts_with("replication"), ~quantile(., q))) %>%
+    unlist()
+  
+  # Jackknife-after-bootstrap quantiles ----------------------------------------
+  jab_quantiles <- jab_samples %>%
+    transmute(quantiles = map(jab_sample,
+                            ~summarize(.,
+                              across(starts_with("replication"), ~quantile(.,q))
+                            ) %>%
+                              unlist()
+                          )
+    )
+  
+  # Calculate bootstrap disruption distance ------------------------------------
+  disruption_dists <- jab_quantiles %>%
+    transmute(disruption = map_dbl(quantiles, ~sum((.-bootstrap_quantiles)^2))) %>%
+    pull(disruption)
+  
+  # Augment jackknife-after-bootstrap results and terminate --------------------
+  jab_samples %>%
+    mutate(disruption = disruption_dists) %>%
+    return()
 }
 
 # Computes boundaries for uncertainty bands ====================================
-get_uncertainty_bands <- function(df_boots, df_jab_samples) {
-  # Find full-data bootstrap quantiles -----------------------------------------
-  boots <- mutate(df_boots,
-             across(starts_with("replication"), ~.^2),
-             l2_value = rowSums(across(starts_with("replication")))
-           )
-  uncertainty_bands <- tibble(
-                         quantile = c(0.05, 0.5, 0.95),
-                         center = quantile(
-                                    boots$l2_value,
-                                    probs = c(0.05, 0.5, 0.95)
-                                  )
-                       )
-  
-  # Find band widths and construct upper/lower bounds --------------------------
-  p <- length(str_which(colnames(df_jab_samples), "replication"))
-  scalar <- qchi(0.95, p)
-  uncertainty_bands$width <- df_jab_samples %>%
-    summarize(across(starts_with("quantile"), ~IQR(.) * scalar)) %>%
-    unlist()
-  uncertainty_bands <- mutate(uncertainty_bands,
-                         lower = center - width,
-                         upper = center + width
-                       )
-  
-  return(uncertainty_bands)
-}
-
-# Checks for outlier points and flags them =====================================
-check_outliers <- function(df, uncertainty) {
-  jab_samples <- mutate(df, outlier = 0)
-  for (col_name in c("quantile_0.05", "quantile_0.50", "quantile_0.95")) {
-    prob <- as.numeric(str_extract(col_name, "(?<=quantile_).*"))
-    band <- filter(uncertainty, quantile == prob)
-    center <- band$center
-    width <- band$width
-    
-    jab_samples <- mutate(jab_samples,
-                     outlier = outlier +
-                               (abs(!!as.name(col_name) - center) > width)
-                   )
-  }
-  
-  jab_samples <- mutate(jab_samples, outlier = outlier >= 1)
-  
-  return(jab_samples)
+get_uncertainty_bound <- function(q, boots, jab_samples) {
+  scalar <- qchisq(
+              q,
+              length(str_which(colnames(jab_samples), "replication"))
+            )
+  return(IQR(jab_samples$disruption) * scalar)
 }
 
 # Helpers ######################################################################

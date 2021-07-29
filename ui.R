@@ -37,12 +37,6 @@ shinyUI(fluidPage(
                 min = 1,
                 value = NULL,
                 step = 1
-              ),
-              sliderInput("param_threshold",
-                "Outlier Threshold:",
-                min = 0, max = 1,
-                value = 0.9,
-                ticks = FALSE
               )
             ),
             
@@ -83,7 +77,8 @@ shinyUI(fluidPage(
             # Variable selection -----------------------------------------------
             column(width = 4,
               h4("Variable Selection"),
-              uiOutput("var_selector")
+              uiOutput("var_selector"),
+              uiOutput("strata_selector")
             )
           ),
           
@@ -95,6 +90,38 @@ shinyUI(fluidPage(
         tabPanelBody("results",
           titlePanel("Results"),
           actionButton("results_next", "Next", width = "100%")
+        ),
+        
+        # Jackknife-after-bootstrap ############################################
+        tabPanelBody("outliers",
+          titlePanel("Case Influence and Outliers"),
+          
+          # Plot ===============================================================
+          plotlyOutput("jab_plot"),
+          fluidRow(
+            column(width = 6,
+              sliderInput("jab_quantile",
+                "Sample Quantile:",
+                min = 0, max = 1,
+                value = 0.5,
+                ticks = FALSE,
+                width = "100%"
+              )
+            ),
+            column(width = 6,
+              sliderInput("outlier_threshold",
+                "Outlier Threshold:",
+                min = 0, max = 1,
+                value = 0.9,
+                ticks = FALSE,
+                width = "100%"
+              )
+            )
+          ),
+          
+          # Outlier list =======================================================
+          dataTableOutput("outlier_list"),
+          uiOutput("boundary_display")
         )
       )
     )

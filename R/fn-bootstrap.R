@@ -1,5 +1,5 @@
 # Bootstrapping manager ========================================================
-do_bootstrap <- function(df, B, spec, coefs = NULL) {
+do_bootstrap <- function(df, B, spec, coefs = NULL, strata = NULL) {
   # Select bootstrap procedure and generate bootstrap samples
   if (spec$stat == "Median") boot_proc <- resample_smooth
   else if (spec$stat == "Linear Regression") boot_proc <- choose_lm_proc(
@@ -7,7 +7,7 @@ do_bootstrap <- function(df, B, spec, coefs = NULL) {
                                                             spec
                                                           )
   else boot_proc <- resample_cases
-  boot_samples <- boot_proc(df, B, spec, coefs)
+  boot_samples <- boot_proc(df, B, spec, coefs, strata)
   
   # Select evaluation method and compute bootstrap replications
   eval_stat <- switch(spec$stat,
@@ -33,14 +33,14 @@ estimate_summary <- function(df, fn) {
 
 # Bootstrap procedures #########################################################
 # Case resampling ==============================================================
-resample_cases <- function(df, B, spec, coefs = NULL) {
-  bootstraps(df, times = B, apparent = TRUE) %>%
+resample_cases <- function(df, B, spec, coefs = NULL, strata = NULL) {
+  bootstraps(df, times = B, strata = all_of(strata), apparent = TRUE) %>%
     mutate(sample = map(splits, ~analysis(.)))
 }
 
 # Smoothed bootstrap ===========================================================
-resample_smooth <- function(df, B, spec, coefs = NULL) {
-  bootstraps(df, times = B, apparent = TRUE) %>%
+resample_smooth <- function(df, B, spec, coefs = NULL, strata = NULL) {
+  bootstraps(df, times = B, strata = all_of(strata), apparent = TRUE) %>%
     mutate(
       sample = map(splits,
                  ~dplyr::select(analysis(.), spec$var) + matrix(
