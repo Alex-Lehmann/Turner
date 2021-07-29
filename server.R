@@ -12,7 +12,7 @@ shinyServer(function(input, output, session) {
       column(width = 12,
         selectInput("data_select",
           "Data:",
-          c("User Upload", "mtcars", "iris", "galaxies")
+          c("User Upload", "mtcars", "iris", "cell_survival", "galaxies")
         ),
         conditionalPanel("input.data_select == 'User Upload'",
           fileInput("user_file", "Upload CSV data", accept = ".csv")

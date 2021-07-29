@@ -112,7 +112,7 @@ shinyUI(fluidPage(
               sliderInput("outlier_threshold",
                 "Outlier Threshold:",
                 min = 0, max = 1,
-                value = 0.9,
+                value = 0.98,
                 ticks = FALSE,
                 width = "100%"
               )
