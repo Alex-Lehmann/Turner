@@ -1,276 +1,286 @@
 library(shiny)
 
 shinyServer(function(input, output, session) {
-  values = reactiveValues()
+  values <- reactiveValues()
+  values$upload_flag <- FALSE
   
-  # Wizard navigation buttons ==================================================
-  # Welcome page ---------------------------------------------------------------
-  observeEvent(input$welcome_next, {
-    updateTabsetPanel(session, "wizard", selected = "data_upload")
-  })
-  
-  # Data upload page -----------------------------------------------------------
-  observeEvent(input$data_upload_next, {
-    updateTabsetPanel(session, "wizard", selected = "settings")
-  })
-  
-  # Settings page --------------------------------------------------------------
-  observeEvent(input$settings_next, {
-    # Show busy dialog
-    show_modal_spinner(spin = "swapping-squares", text = "Resampling...")
-    
-    # Store settings for reporting
-    values$param_B = input$param_B
-    values$param_statistic = input$param_statistic
-    values$param_variable = input$param_variable
-    
-    # Resample
-    boot_results = do_bootstrap(
-      values$user_file,
-      B = input$param_B,
-      fn = input$param_statistic,
-      variable = input$param_variable)
-    values$boot_reps0 = boot_results$reps
-    values$boot_stat0 = boot_results$stat
-    
-    # Navigate to results
-    updateTabsetPanel(session, "wizard", selected = "boot_results")
-    remove_modal_spinner()
-  })
-  
-  observeEvent(input$settings_previous, {
-    updateTabsetPanel(session, "wizard", selected = "data_upload")
-  })
-  
-  # Bootstrap results page -----------------------------------------------------
-  observeEvent(input$boot_results_next, {
-    # Show busy dialog
-    show_modal_spinner(
-      spin = "swapping-squares",
-      text = "Searching for outliers..."
-    )
-    # Check for outliers
-    values$jab_values = jackknife_after_bootstrap(values$boot_reps0)
-    values$jab_uncertainty = get_uncertainty_bands(
-                               values$boot_reps0,
-                               values$jab_values
-                             )
-    values$outliers = check_outliers(values$jab_values, values$jab_uncertainty)
-    # Navigate to outlier page
-    updateTabsetPanel(session, "wizard", selected = "outlier_detection")
-    remove_modal_spinner()
-  })
-  
-  observeEvent(input$boot_results_previous, {
-    updateTabsetPanel(session, "wizard", selected = "settings")
-  })
-  
-  # Outlier detection page -----------------------------------------------------
-  observeEvent(input$outliers_next, {
-    
-  })
-  
-  observeEvent(input$outliers_previous, {
-    updateTabsetPanel(session, "wizard", selected = "boot_results")
-  })
-  
-  # Data ingest ================================================================
-  observeEvent(input$user_file, {
-    # Check that file is a CSV; reject if not
-    path = input$user_file$datapath
-    if (tools::file_ext(path) != "csv") {
-      message(paste0("File ", path, " is not a .csv file."))
-      return()
-    } else {
-      # Add row IDs
-      df = readr::read_csv(path, col_types=cols())
-      values$user_file = mutate(df, row_id = 1:nrow(df))
-    }
-  })
-  
-  # UI objects =================================================================
-  # Data preview ---------------------------------------------------------------
-  output$data_preview = DT::renderDataTable({
-    # Don't display table until something is loaded
-    if (is.null(values$user_file)) return(NULL) else return(values$user_file)
-  }, options=list(scrollX=TRUE))
-  
-  # Data page conditional action button ----------------------------------------
-  output$data_upload_next = renderUI({
-    ui = NULL
-    if (!is.null(values$user_file)) {
-      ui = fluidRow(
-        column(width = 12,
-          hr(),
-          actionButton("data_upload_next", "Next", width = "100%")
+  # UI element definitions #####################################################
+  # Procedure setup ============================================================
+  # Data selector/upload -------------------------------------------------------
+  output$data_selector <- renderUI({
+    fluidRow(
+      column(width = 12,
+        selectInput("data_select",
+          "Data:",
+          c("User Upload", "mtcars", "iris", "cell_survival", "galaxies")
+        ),
+        conditionalPanel("input.data_select == 'User Upload'",
+          fileInput("user_file", "Upload CSV data", accept = ".csv")
         )
       )
-    }
-    return(ui)
+    )
   })
   
-  # Statistic selection --------------------------------------------------------
-  output$select_variable = renderUI({
-    # Get variables from loaded data, if present
-    if (!is.null(values$user_file)) choices = colnames(values$user_file)
-    else choices = NULL
+  # Data preview ---------------------------------------------------------------
+  output$data_preview <- renderDataTable({
+    # Don't display table until something is loaded
+    if (is.null(values$data)) return(NULL)
+    else return(dplyr::select(values$data, -row_id))
+  }, options = list(scrollX=TRUE))
+  
+  # Variable selectors ---------------------------------------------------------
+  output$var_selector <- renderUI({
+    # Define selectors
+    var1_selector <- selectInput("param_var1", "var1_selector", values$col_names)
+    var2_selector <- selectInput("param_var2", "var2_selector", values$col_names)
     
-    # Generate input
-    selectInput("param_variable", "Variable:", choices)
+    vars_selector <- selectInput("param_vars",
+                       "vars_selector",
+                       values$col_names,
+                       multiple = TRUE
+                     )
+    
+    # Generate control
+    if (input$param_stat %in% c("Correlation", "Smoothing Spline")) {
+      control <- fluidRow(column(width = 12, var1_selector, var2_selector))
+    } else if (input$param_stat %in% c("Linear Regression", "LOESS")) {
+      control <- fluidRow(column(width = 12, var1_selector, vars_selector))
+    } else control <- var1_selector
+    
+    return(control)
   })
   
-  # Bootstrap results ==========================================================
-  boot_results_server("prelim", values)
+  output$strata_selector <- renderUI({
+    selectInput("param_strata", "Strata", c(" ", values$col_names))
+  })
   
-  # Outlier detection ==========================================================
-  # Jackknife-after-bootstrap plot ---------------------------------------------
-  output$jab_plot = renderPlotly({
+  # Jackknife-after-bootstrap ==================================================
+  # Plot -----------------------------------------------------------------------
+  output$jab_plot <- renderPlotly({
+    # Calculate disruption for given quantile
+    values$jab_samples <- bootstrap_disruption(
+                            input$jab_quantile,
+                            values$boots,
+                            values$jab_samples
+                          )
+    
+    # Calculate uncertainty for given quantile and detect outliers
+    values$uncertainty <- get_uncertainty_bound(
+                            input$outlier_threshold,
+                            values$boots,
+                            values$jab_samples
+                          )
+    values$jab_samples <- mutate(values$jab_samples,
+                            outlier = disruption > values$uncertainty
+                          )
+    
     # Base Plotly object
-    fig = plot_ly(type = "scatter", showlegend = FALSE) %>%
+    fig <- plot_ly(type = "scatter", showlegend = FALSE) %>%
       layout(
         title = "Jackknife-After-Bootstrap Plot",
         xaxis = list(title = "Relative Influence", zeroline = FALSE),
-        yaxis = list(title = "Value")
+        yaxis = list(title = "Disruption")
       ) %>%
       config(displayModeBar = FALSE)
     
-    for (q in str_subset(colnames(values$jab_values), "^quantile_")) {
-      # Extract quantile value from name
-      quantile_prob = q %>%
-        str_extract("(?<=_).*") %>%
-        as.numeric()
-      
-      # Sorted tibble to trace
-      jack_data = values$jab_values %>%
-        mutate(outlier = ifelse(
-                           deleted_case %in% values$outliers,
-                           TRUE, FALSE
-                         )
-               ) %>%
-        select(deleted_case, rel_influence, as.name(q), outlier) %>%
-        arrange(rel_influence)
-      colnames(jack_data) = c("deleted_case", "x", "y", "outlier")
-      
-      # Get uncertainty for this quantile and make Plotly-friendly
-      uncertainty_interval = filter(
-                               values$jab_uncertainty,
-                               quantile == quantile_prob
-                             )
-      x = values$jab_values$rel_influence
-      x_bounds = c(min(x), max(x)) * 1.05
-      uncertainty_data = tibble(
-                           x = x_bounds,
-                           quantile = rep(uncertainty_interval$full_quantile,2),
-                           upper = rep(uncertainty_interval$upper, 2),
-                           lower = rep(uncertainty_interval$lower, 2)
-                         )
-      
-      # Add traces
-      fig = fig %>%
-        # Uncertainty bands
-        add_trace(
-          data = uncertainty_data,
-          x = ~x, y = ~quantile,
-          name = paste0("Full-data ", quantile_prob * 100, "% quantile"),
-          mode = "lines",line = list(color = "#000000", dash = "dash"),
-          hoverinfo = "skip"
-        ) %>%
-        add_trace(
-          data = uncertainty_data,
-          x = ~x, y = ~upper,
-          mode = "lines", line = list(color = "transparent"),
-          fillcolor = "rgba(0, 0, 0, 0.2)",
-          hoverinfo = "skip"
-        ) %>%
-        add_trace(
-          data = uncertainty_data,
-          x = ~x, y = ~lower,
-          mode = "lines", line = list(color = "transparent"),
-          fill = "tonexty", fillcolor = "rgba(0, 0, 0, 0.2)",
-          hoverinfo = "skip"
-        ) %>%
-        
-        # Jackknife quantiles
-        add_trace(
-          data = jack_data,
-          name = paste0(quantile_prob * 100, "% quantile"),
-          x = ~x,
-          y = ~y,
-          mode = "markers", marker = list(size = 10),
-          symbol = ~outlier, symbols = c("o", "x-thin"),
-          color = "orange",
-          customdata = ~deleted_case,
-          hovertemplate = "ID: %{customdata}<br>Influence: %{x}<br>Value: %{y}"
-        ) %>%
-        add_trace(
-          data = jack_data,
-          x = ~x,
-          y = ~y,
-          mode = "lines",
-          color = "orange",
-          hoverinfo = "skip"
-        )
-    }
+    # Sorted tibble to trace
+    jab_data <- values$jab_samples %>%
+      dplyr::select(deleted_case, rel_influence, disruption, outlier) %>%
+      arrange(rel_influence) %>%
+      set_colnames(c("deleted_case", "x", "y", "outlier"))
     
-    values$jab_plot = fig
+    # Uncertainty bound tibble
+    uncertainty_data <- tibble(
+                          x = c(0, max(jab_data$x)) * 1.05,
+                          y = values$uncertainty
+                        )
+    
+    # Add traces
+    fig <- fig %>%
+      # Uncertainty bound
+      add_trace(
+        data = uncertainty_data,
+        x = ~x, y = ~y,
+        name = "Uncertainty Bound",
+        mode = "lines", line = list(color = "#000000", dash = "dash"),
+        fill = "tozeroy", fillcolor = "rgba(0, 0, 0, 0.2)",
+        hoverinfo = "skip"
+      ) %>%
+      
+      # Jackknife quantiles
+      add_trace(
+        data = jab_data,
+        x = ~x, y = ~y,
+        mode = "markers", marker = list(size = 10),
+        symbol = ~outlier, symbols = c("o", "x-thin"),
+        color = "orange",
+        customdata = ~deleted_case,
+        hovertemplate = "ID: %{customdata}<br>Influence: %{x}<br>Disruption: %{y}"
+      ) %>%
+      add_trace(
+        data = jab_data,
+        x = ~x, y = ~y,
+        mode = "lines",
+        color = "orange",
+        hoverinfo = "skip"
+      )
+    
     fig
   })
   
-  # Outlier display ------------------------------------------------------------
-  output$outliers = DT::renderDataTable({
-    if (length(values$outliers > 0)){
-      values$outlier_table = values$user_file %>%
-        filter(row_id %in% values$outliers)
-    } else NULL
-  }, selection = list(selected = 1:length(values$outliers)),
-     options = list(scrollX = TRUE, ordering = FALSE))
+  # Outlier list ---------------------------------------------------------------
+  output$outlier_list <- renderDataTable({
+    outliers <- filter(values$jab_samples, outlier)
+    
+    jab_data <- outliers %>%
+      dplyr::select(
+        `Case No.` = deleted_case,
+        `Relative Influence` = rel_influence,
+        Disruption = disruption
+      )
+    replication_data <- outliers %>%
+      dplyr::select(starts_with("replication")) %>%
+      set_colnames(
+        str_to_title(str_replace_all(colnames(.), "replication_", ""))
+      )
+    
+    cbind(replication_data, jab_data) %>%
+      relocate(`Case No.`) %>%
+      return()
+  })
   
-  # EHs for outlier point selection --------------------------------------------
-  # From plot
-  observeEvent(event_data("plotly_click"), {
-    clicked_marker = event_data("plotly_click")
-    
-    # Check if clicked marker is an outlier
-    click_id = clicked_marker$customdata
-    if (is.null(click_id)) return()
-    
-    table_ids = values$outlier_table$row_id
-    if (click_id %in% table_ids) {
-      selection_ids = table_ids[input$outliers_rows_selected]
-      if (click_id %in% selection_ids) {
-        # If case is selected, deselect
-        selection_index = which(selection_ids == click_id)
-        dataTableProxy("outliers") %>%
-          selectRows(input$outliers_rows_selected[-selection_index])
-      } else {
-        # If case is not selected, select
-        click_index = which(table_ids == click_id)
-        dataTableProxy("outliers") %>%
-          selectRows(c(input$outliers_rows_selected, click_index))
-      }
+  # Outlier boundary -----------------------------------------------------------
+  output$boundary_display <- renderUI({
+    HTML(paste0("<b>Outlier Boundary: ", values$uncertainty, "</b>"))
+  })
+  
+  # UI event handlers ##########################################################
+  # Procedure setup page =======================================================
+  # File upload checking -------------------------------------------------------
+  observeEvent(input$user_file, {
+    # Check that file is a CSV; reject if not
+    path <- input$user_file$datapath
+    if (tools::file_ext(path) != "csv") {
+      message(paste0("File ", path, " is not a .csv file."))
+    } else {
+      # Add row IDs and store
+      df <- read_csv(path, col_types = cols())
+      values$data <- mutate(df, row_id = 1:nrow(df))
+      values$col_names <- colnames(df)
+      values$upload_flag <- TRUE
     }
   })
   
-  # From table
-  observeEvent(input$outliers_rows_selected, ignoreNULL = FALSE, {
-    if (!is.null(input$outliers_rows_selected)) {
-      # Make new vertical lines
-      vlines = values$jab_values %>%
-        filter(deleted_case %in% values$outliers) %>%
-        slice(input$outliers_rows_selected) %>%
-        pull(rel_influence) %>%
-        make_vlines(dash = "dot")
-    } else vlines = NULL
+  # Toy data input -------------------------------------------------------------
+  observeEvent(input$data_select, {
+    if (input$data_select != "User Upload") {
+      path <- paste0("toy_data/", input$data_select, ".csv")
+      df <- read_csv(path, col_types = cols())
+      values$data <- mutate(df, row_id = 1:nrow(df))
+      values$col_names <- colnames(df)
+      values$upload_flag <- TRUE
+    }
+  })
+  
+  # Navigation button event handlers ###########################################
+  # Welcome page ===============================================================
+  observeEvent(input$welcome_next, {
+    updateTabsetPanel(session, "wizard", "setup")
+  })
+  
+  # Procedure setup page =======================================================
+  observeEvent(input$settings_next, {
+    # Set up procedure ---------------------------------------------------------
+    if (!is.na(input$param_B) & input$param_B > 0) {
+      values$param_B <- round(input$param_B)
+    } else values$param_B <- 1000
+    if (!is.na(input$param_seed) & input$param_seed > 0) {
+      values$param_seed <- round(input$param_seed)
+    } else values$param_seed <- NA
+    if (input$param_strata == " ") values$strata <- NULL
+    else values$strata <- input$param_strata
     
-    # Update layout without any vertical lines
-    plotlyProxy("jab_plot", session) %>%
-      plotlyProxyInvoke("relayout",
-        list(
-          title = "Jackknife-After-Bootstrap Plot",
-          xaxis = list(title = "Relative Influence", zeroline = FALSE),
-          yaxis = list(title = "Value"),
-          shapes = vlines
-        )
-      )
+    # Generate procedure specification
+    if (input$param_stat == "Correlation") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_var2
+                     )
+    } else if (input$param_stat == "Linear Regression") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_vars,
+                       fit = input$param_fit
+                     )
+    } else if (input$param_stat == "Smoothing Spline") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_var2,
+                       input$param_threshold
+                     )
+    } else if (input$param_stat == "LOESS") {
+      values$spec <- make_spec(
+                       input$param_stat,
+                       input$param_var1,
+                       input$param_vars,
+                       target = c(
+                                  input$param_target1,
+                                  input$param_target2,
+                                  input$param_target3
+                                )
+                     )
+    }
+    else values$spec <- make_spec(
+                          input$param_stat,
+                          input$param_var1
+                        )
+    
+    # Random seed --------------------------------------------------------------
+    if (!is.na(values$param_seed)) set.seed(values$param_seed)
+    else set.seed(NULL)
+    
+    # Execute resampling -------------------------------------------------------
+    values$estimate <- point_estimate(values$data, values$spec)
+    values$boots <- do_bootstrap(
+                      df = values$data,
+                      B = values$param_B,
+                      spec = values$spec,
+                      coefs = values$estimate,
+                      strata = values$strata
+                    )
+    
+    # Run diagnostics ----------------------------------------------------------
+    values$jab_samples <- values$boots %>%
+      jackknife_after_bootstrap() %>%
+      jackknife_influence()
+    
+    # Bootstrap estimates ------------------------------------------------------
+    values$se <- estimate_summary(values$boots, sd)
+    values$bias <- map2(
+                     estimate_summary(values$boots, mean),
+                     values$estimate,
+                     `-`
+                   )
+    values$skewness <- estimate_summary(values$boots, skewness)
+    values$kurtosis <- estimate_summary(values$boots, kurtosis)
+    
+    # Display results ----------------------------------------------------------
+    # Generate results modules for each estimated parameter
+    for (parameter in names(values$estimate)) {
+      id <- str_replace(parameter, "replication_", "")
+      insertUI("#results_next", where = "beforeBegin", results_ui(id))
+      results_server(id, values)
+    }
+    
+    # Show results
+    updateTabsetPanel(session, "wizard", "results")
+  })
+  
+  # Results page ===============================================================
+  observeEvent(input$results_next, {
+    updateTabsetPanel(session, "wizard", "outliers")
   })
 })

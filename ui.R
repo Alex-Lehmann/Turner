@@ -1,103 +1,127 @@
 library(shiny)
 
 shinyUI(fluidPage(
-  navbarPage(title="Turner (WIP)",
+  navbarPage(title = "Turner (WIP)",
     tabPanel("Bootstrap",
       tabsetPanel(type = "hidden", id = "wizard", selected = "welcome",
-        # Welcome page =========================================================
+        # Welcome page #########################################################
         tabPanelBody("welcome",
-          sidebarLayout(
-            # Contact info sidebar ---------------------------------------------
-            sidebarPanel(
-              titlePanel("Contact"),
-              fluidRow(width=12, align="center",
-                HTML("<script type='text/javascript' src='https://platform.linkedin.com/badges/js/profile.js' async defer></script><div class='LI-profile-badge'  data-version='v1' data-size='medium' data-locale='en_US' data-type='vertical' data-theme='light' data-vanity='alex-lehmann-ds'><a class='LI-simple-link' href='https://ca.linkedin.com/in/alex-lehmann-ds?trk=profile-badge'>Alex Lehmann</a></div>"),
-                HTML("<br><b>Email: </b><a href='mailto:alex.lehmann@cmail.carleton.ca'>alex.lehmann@cmail.carleton.ca</a>")
+          welcome_ui("default"),
+          actionButton("welcome_next", "Start", width = "100%")
+        ),
+        
+        # Procedure setup ######################################################
+        tabPanelBody("setup",
+          titlePanel("Procedure Setup"),
+          
+          # Data upload ========================================================
+          h3("Data"),
+          uiOutput("data_selector"),
+          dataTableOutput("data_preview"),
+          hr(),
+          
+          # Procedure setup ====================================================
+          h3("Bootstrap Settings"),
+          fluidRow(
+            # Bootstrap parameters ---------------------------------------------
+            column(width = 4,
+              h4("Bootstrap Parameters"),
+              numericInput("param_B",
+                "Bootstrap Samples:",
+                min = 1,
+                value = 1000,
+                step = 1
               ),
-              
-              titlePanel("Source"),
-              HTML("<a href='https://github.com/Alex-Lehmann/Turner'>View the full source code on GitHub.</a>")
+              numericInput("param_seed",
+                "Random Seed:",
+                min = 1,
+                value = NULL,
+                step = 1
+              )
             ),
             
-            # Intro panel ------------------------------------------------------
-            mainPanel(
-              titlePanel("Welcome to Turner!"),
-              HTML("<p>Turner is an app built to make boostrapping procedures and
-               their related diagnostics accessible and easy to use. Turner uses
-               the <a href='https://www.tidymodels.org/'>tidymodels</a>
-               framework to resample your provided data and employs a number of
-               diagnostic methods to ensure your results are robust."),
-              HTML("<p><b>Important note: Turner is a work-in-progress. Some
-               features may be missing or may not work properly. The user
-               interface may be ugly. Use at your own risk.</b>"),
-              hr(),
-              actionButton("welcome_next", "Start", width="100%")
+            # Model selection --------------------------------------------------
+            column(width = 4,
+              h4("Model/Statistic Selection"),
+              selectInput("param_stat",
+                "Model/Statistic:",
+                c(
+                  "Mean", "Median", "Correlation", # Summary statistics
+                  "Linear Regression", "Smoothing Spline", "LOESS" # Regressions
+                )
+              ),
+              
+              # Linear regression-specific
+              conditionalPanel("input.param_stat == 'Linear Regression'",
+                selectInput("param_fit",
+                  "Fit Method:",
+                  c(
+                    "Ordinary Least Squares",
+                    "Iteratively Re-Weighted Least Squares"
+                  )
+                )
+              ),
+              
+              # LOESS-specific
+              conditionalPanel("input.param_stat == 'LOESS'",
+                numericInput("param_target1", "target1_value", NULL),
+                conditionalPanel("input.param_vars.length > 1",
+                  numericInput("param_target2", "target2_value", NULL)
+                ),
+                conditionalPanel("input.param_vars.length > 2",
+                  numericInput("param_target3", "target3_value", NULL)
+                )
+              )
+            ),
+            
+            # Variable selection -----------------------------------------------
+            column(width = 4,
+              h4("Variable Selection"),
+              uiOutput("var_selector"),
+              uiOutput("strata_selector")
             )
-          )
-        ),
-        
-        # Data upload page =====================================================
-        tabPanelBody("data_upload",
-          titlePanel("Data"),
-          fileInput("user_file", "Upload your data as a CSV", accept = ".csv"),
-          dataTableOutput("data_preview"),
-          uiOutput("data_upload_next")
-        ),
-        
-        # Bootstrap setup page =================================================
-        tabPanelBody("settings",
-          titlePanel("Bootstrap Setup"),
-          # Settings -----------------------------------------------------------
-          numericInput(
-            "param_B",
-            "Number of bootstrap samples:",
-            min=1,
-            value=1000,
-            step=1,
           ),
-          selectInput("param_statistic", "Statistic:", c("Mean")),
-          uiOutput("select_variable"),
-          hr(),
-          # Navigation ---------------------------------------------------------
-          fluidRow(
-            column(width = 6,
-              actionButton("settings_previous", "Previous", width = "100%")
-            ),
-            column(width = 6,
-              actionButton("settings_next", "Next", width = "100%")
-            )
-          )
+          
+          # Go button ----------------------------------------------------------
+          actionButton("settings_next", "Compute", width = "100%")
         ),
         
-        # Bootstrap results page ===============================================
-        tabPanelBody("boot_results",
-          titlePanel("Preliminary Results"),
-          boot_results_ui("prelim"),
-          # Navigation ---------------------------------------------------------
-          fluidRow(
-            column(width = 6,
-              actionButton("boot_results_previous", "Previous", width = "100%")
-            ),
-            column(width = 6,
-              actionButton("boot_results_next", "Next", width = "100%")
-            )
-          )
+        # Results ##############################################################
+        tabPanelBody("results",
+          titlePanel("Results"),
+          actionButton("results_next", "Next", width = "100%")
         ),
         
-        tabPanelBody("outlier_detection",
-          # Outlier detection controls -----------------------------------------
-          titlePanel("Outliers"),
+        # Jackknife-after-bootstrap ############################################
+        tabPanelBody("outliers",
+          titlePanel("Case Influence and Outliers"),
+          
+          # Plot ===============================================================
           plotlyOutput("jab_plot"),
-          dataTableOutput("outliers"),
-          # Navigation ---------------------------------------------------------
           fluidRow(
             column(width = 6,
-              actionButton("outliers_previous", "Previous", width = "100%")
+              sliderInput("jab_quantile",
+                "Sample Quantile:",
+                min = 0, max = 1,
+                value = 0.5,
+                ticks = FALSE,
+                width = "100%"
+              )
             ),
             column(width = 6,
-              #actionButton("outliers_next", "Next", width = "100%")
+              sliderInput("outlier_threshold",
+                "Outlier Threshold:",
+                min = 0, max = 1,
+                value = 0.98,
+                ticks = FALSE,
+                width = "100%"
+              )
             )
-          )
+          ),
+          
+          # Outlier list =======================================================
+          dataTableOutput("outlier_list"),
+          uiOutput("boundary_display")
         )
       )
     )
