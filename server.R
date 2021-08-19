@@ -190,6 +190,13 @@ shinyServer(function(input, output, session) {
   
   # Procedure setup page =======================================================
   observeEvent(input$settings_next, {
+    # Display busy dialog ------------------------------------------------------
+    show_modal_spinner(
+      spin = "swapping-squares",
+      color = "#112446",
+      text = "Bootstrapping..."
+    )
+    
     # Set up procedure ---------------------------------------------------------
     if (!is.na(input$param_B) & input$param_B > 0) {
       values$param_B <- round(input$param_B)
@@ -277,6 +284,9 @@ shinyServer(function(input, output, session) {
     
     # Show results
     updateTabsetPanel(session, "wizard", "results")
+    
+    # Terminate busy dialog
+    remove_modal_spinner()
   })
   
   # Results page ===============================================================
