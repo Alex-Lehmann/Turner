@@ -55,7 +55,7 @@ resample_smooth <- function(df, B, spec, coefs = NULL, strata = NULL) {
 }
 
 # Residual resampling for models y = XB + e ====================================
-resample_residuals <- function(df, B, spec, coefs) {
+resample_residuals <- function(df, B, spec, coefs, strata = NULL) {
   # Calculate residuals --------------------------------------------------------
   # Construct design matrix
   X_values <- rep(1, nrow(df))
